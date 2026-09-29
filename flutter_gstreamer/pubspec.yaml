@@ -1,0 +1,24 @@
+name: flutter_gstreamer
+description: "Dart FFI bindings to GStreamer 1.x, loaded dynamically at run time: pipelines, appsrc, bus/messages, GstDiscoverer, plus in-process VP8/WebM video encoding from PNG or RGBA frames and a media probe."
+version: 0.1.0
+repository: https://github.com/LuminaGame/tools
+issue_tracker: https://github.com/LuminaGame/tools/issues
+topics:
+  - gstreamer
+  - ffi
+  - video
+
+environment:
+  sdk: ^3.12.0
+resolution: workspace
+
+# Pure Dart (no Flutter, no native-assets hook): the GStreamer libraries are
+# opened with DynamicLibrary at run time, so nothing is compiled or linked.
+dependencies:
+  ffi: ^2.1.4
+
+dev_dependencies:
+  ffigen: ^20.1.1
+  flutter_lints: ^6.0.0
+  image: ^4.9.2
+  test: ^1.28.0

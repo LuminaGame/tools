@@ -1,0 +1,13 @@
+.dart_tool/
+/build/
+build/
+**/pubspec.lock
+*.so
+*.o
+*.a
+*.dylib
+*.dll
+third_party/openriglogic/build/
+third_party/openriglogic/build-windows/
+third_party/openriglogic/lib/
+.flutter-plugins-dependencies

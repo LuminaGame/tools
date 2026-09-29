@@ -1,0 +1,6 @@
+@EMBED_PROLOGUE@
+
+const unsigned char @EMBED_DATA_VARNAME@[] = {@EMBED_DATA@};
+const size_t @EMBED_SIZE_VARNAME@ = sizeof(@EMBED_DATA_VARNAME@);
+
+@EMBED_EPILOGUE@

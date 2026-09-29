@@ -1,0 +1,38 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+**/build/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/pubspec_overrides.yaml
+pubspec_overrides.yaml
+*.iml
+.idea/
+.vscode/
+
+# Local links (see .lumina_symlinks.json / the Filament build notes)
+/filament
+/test-assets
+
+# Native build outputs
+*.so
+*.o
+*.a
+*.dylib
+*.dll
+*.lib
+*.obj
+*.pdb
+*.exp
+flutter_riglogic/third_party/openriglogic/build/
+flutter_riglogic/third_party/openriglogic/build-windows/
+flutter_riglogic/third_party/openriglogic/lib/
+
+# Packaging secrets
+*.pfx
+windows/packaging/dev/
+
+# OS
+.DS_Store
+Thumbs.db

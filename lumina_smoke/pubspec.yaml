@@ -1,0 +1,37 @@
+name: lumina_smoke
+description: "Smoke-test evidence for the Lumina packages: PNG and VP8/WebM artifacts with sidecar JSON matched by declared test name, the smoke-video rules and probe, frame recorders, and the flutter test runner that writes the linked HTML smoke report."
+version: 0.1.0
+# Git dependencies: not published to pub.dev.
+publish_to: none
+repository: https://github.com/LuminaGame/tools
+issue_tracker: https://github.com/LuminaGame/tools/issues
+topics:
+  - testing
+  - smoke-test
+  - video
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.0.0"
+resolution: workspace
+
+# Engine-independent: nothing here depends on flutter_filament, lumina or
+# lumina_ui (they depend on this package). The artifact API, the video
+# probe and the report runner are plain Dart (`dart:io` plus
+# flutter_gstreamer's dynamically loaded GStreamer); only
+# `package:lumina_smoke/flutter.dart` (the widget recorder and captures)
+# needs Flutter.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  # In-process VP8/WebM encoding and media probing (tools repo). A consuming
+  # workspace's pubspec_overrides.yaml can point it at a local checkout.
+  flutter_gstreamer:
+    git:
+      url: https://github.com/LuminaGame/tools.git
+      path: flutter_gstreamer
+
+dev_dependencies:
+  flutter_lints: ^6.0.0

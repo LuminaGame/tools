@@ -1,0 +1,101 @@
+# Standard CMake application installation procedure
+#
+# Usage:
+#   include(InstallApplication)
+#   install_application(my_target)
+#
+# Module dependencies:
+#   CMakePackageConfigHelpers
+#   GNUInstallDirs
+#
+# Preconditions:
+#   Assumes that standard, global CMake variables are accessible, such as PROJECT_NAME
+
+set(INSTALL_APPLICATION_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
+macro(install_application target_name)
+    # component_name is an optional argument, and will default to the given target_name
+    set(COMPONENT_NAME ${target_name})
+    set(extra_args ${ARGN})
+    list(LENGTH extra_args num_extra_args)
+    if(${num_extra_args} GREATER 0)
+        list(GET extra_args 0 COMPONENT_NAME)
+    endif()
+
+    include(GNUInstallDirs)
+    set(REPRESENTATIVE_TARGET_NAME ${target_name})
+    set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+    # Set install destinations and associate installed target files with an export
+    install(TARGETS ${REPRESENTATIVE_TARGET_NAME}
+        EXPORT ${PROJECT_NAME}-targets
+        COMPONENT ${COMPONENT_NAME}
+        RUNTIME
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            COMPONENT ${COMPONENT_NAME}
+        LIBRARY
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT ${COMPONENT_NAME}
+            NAMELINK_COMPONENT ${COMPONENT_NAME}
+        ARCHIVE
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT ${COMPONENT_NAME}
+        PUBLIC_HEADER
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            COMPONENT ${COMPONENT_NAME}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    # Write build-tree targets
+    if(DEFINED _${PROJECT_NAME}_TARGETS_EXPORTED)
+        export(TARGETS ${REPRESENTATIVE_TARGET_NAME}
+            APPEND
+            FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake
+            NAMESPACE ${PROJECT_NAME}::)
+    else()
+        export(TARGETS ${REPRESENTATIVE_TARGET_NAME}
+            FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake
+            NAMESPACE ${PROJECT_NAME}::)
+        set(_${PROJECT_NAME}_TARGETS_EXPORTED TRUE CACHE INTERNAL "")
+    endif()
+    # Allow find_package to locate package without installing it (find it's build-tree)
+    export(PACKAGE ${PROJECT_NAME})
+
+    # Write install-tree targets
+    install(EXPORT ${PROJECT_NAME}-targets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${INSTALL_CONFIGDIR}
+        COMPONENT ${COMPONENT_NAME})
+
+    include(CMakePackageConfigHelpers)
+
+    # Generate build-tree configuration
+    configure_package_config_file("${INSTALL_APPLICATION_SOURCE_DIR}/ConfigApplication.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+        INSTALL_DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+        INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR})
+
+    # Generate install-tree configuration
+    configure_package_config_file("${INSTALL_APPLICATION_SOURCE_DIR}/ConfigApplication.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.install.cmake"
+        INSTALL_DESTINATION ${INSTALL_CONFIGDIR})
+
+    # Generate package version file
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY ExactVersion)
+
+    # Install the install-tree configuration
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.install.cmake"
+        DESTINATION ${INSTALL_CONFIGDIR}
+        RENAME "${PROJECT_NAME}Config.cmake"
+        COMPONENT ${COMPONENT_NAME})
+
+    # Install package version file
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        DESTINATION ${INSTALL_CONFIGDIR}
+        COMPONENT ${COMPONENT_NAME})
+endmacro()
