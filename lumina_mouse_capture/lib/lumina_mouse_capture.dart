@@ -2,7 +2,8 @@
 ///
 /// While a game owns the mouse the pointer is hidden and held in place, and
 /// the mouse keeps reporting how far it moved: Wayland pointer constraints +
-/// relative pointer, or an X11 grab with warp-to-centre. Everything goes
+/// relative pointer, an X11 grab with warp-to-centre, or Windows raw input
+/// with a clipped, hidden cursor. Everything goes
 /// through [LuminaMouseCapture.backend], which is a
 /// [RecordingMouseCaptureBackend] in every test, smoke and harness run.
 library;
@@ -25,8 +26,8 @@ export 'src/recording_backend.dart';
 class MouseCaptureBackendChoice {
   const MouseCaptureBackendChoice._(this.reason, this._platform);
 
-  /// `test binding`, `LUMINA_MOUSE_CAPTURE=off`, `web`, `not Linux` or
-  /// `platform channel`.
+  /// `test binding`, `LUMINA_MOUSE_CAPTURE=off`, `web`,
+  /// `unsupported platform` or `platform channel`.
   final String reason;
   final bool _platform;
 
@@ -71,7 +72,8 @@ abstract final class LuminaMouseCapture {
   /// The default backend's rule:
   /// - `LUMINA_MOUSE_CAPTURE=off|record` → recording;
   /// - a test binding (`flutter test`, `integration_test`) → recording;
-  /// - the web, or not Linux → recording (nothing to capture with);
+  /// - the web, or a platform other than Linux and Windows → recording
+  ///   (nothing to capture with);
   /// - otherwise the platform channel.
   static MouseCaptureBackendChoice chooseDefault({
     Map<String, String>? environment,
@@ -88,8 +90,9 @@ abstract final class LuminaMouseCapture {
       return const MouseCaptureBackendChoice._('test binding', false);
     }
     if (isWeb) return const MouseCaptureBackendChoice._('web', false);
-    if ((platform ?? defaultTargetPlatform) != TargetPlatform.linux) {
-      return const MouseCaptureBackendChoice._('not Linux', false);
+    final target = platform ?? defaultTargetPlatform;
+    if (target != TargetPlatform.linux && target != TargetPlatform.windows) {
+      return const MouseCaptureBackendChoice._('unsupported platform', false);
     }
     return const MouseCaptureBackendChoice._('platform channel', true);
   }

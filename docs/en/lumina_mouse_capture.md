@@ -20,9 +20,14 @@ dependencies:
 
 - **Wayland**: `zwp_pointer_constraints_v1.lock_pointer` (one-shot) and `zwp_relative_pointer_v1.relative_motion`, bound on GDK's own Wayland connection.
 - **X11**: a seat grab on the toplevel window, a warp to the centre, and a 4 ms poll that reads the offset and warps back.
+- **Windows**: raw mouse input (`WM_INPUT`) for the motion, with the cursor hidden and clipped (`ClipCursor`) to one pixel at the capture centre; focus loss, minimise and closing the window give it back.
 - **Other platforms and the web**: no capture; the recording backend answers instead.
 
 The Linux implementation (`linux/`, GTK) needs GTK 3 and, for Wayland pointer lock, `wayland-client`, `wayland-scanner` and `wayland-protocols` (pointer-constraints and relative-pointer). Without them the plugin still builds and reports no Wayland support.
+
+### Windows
+
+`windows/` registers raw mouse input for the top-level window (legacy mouse messages stay on, so Flutter still gets clicks and the wheel) and receives it through a top-level window proc delegate. On `capture` it remembers where the cursor was, hides it and clips it to one pixel at the requested centre (logical view coordinates scaled by the view's DPI, in virtual-screen coordinates, so any monitor works). `WM_INPUT` reports become one `motion` event per message-loop turn, in logical pixels; they are unaccelerated device counts (about one physical pixel each at the default pointer speed). Absolute devices (remote desktop, tablets, some virtual machines) report positions, which are turned into deltas. A capture needs the window in the foreground. Deactivation (`WM_ACTIVATE`, `WM_ACTIVATEAPP`) ends it with `lost` reason `focus`, minimising with `minimized`, destroying the window with `window`; display and DPI changes move the clip. Every end (release, loss, plugin teardown) unclips, shows the cursor, puts it back where it was and unregisters raw input, exactly once. The plugin does not handle keys (no Escape release): the game or Play-In-Editor owns them. The native side refuses to capture under `LUMINA_MOUSE_CAPTURE=off|record`, as on Linux.
 
 ## Usage
 
@@ -34,7 +39,7 @@ import 'package:lumina_mouse_capture/lumina_mouse_capture.dart';
 final capture = LuminaMouseCapture.backend;
 
 final support = await capture.support();
-// support.kind: wayland, x11, unsupported, disabled or recording
+// support.kind: wayland, x11, windows, unsupported, disabled or recording
 // support.pointerLock / support.relativeMotion / support.detail
 
 final sub = capture.events.listen((event) {
@@ -43,8 +48,9 @@ final sub = capture.events.listen((event) {
       // relative movement while captured
     case MouseCaptureLocked():
       // the compositor confirmed the lock
-    case MouseCaptureLost():
-      // focus loss or the compositor ended the capture
+    case MouseCaptureLost(:final reason):
+      // focus loss or the compositor ended the capture (Windows: reason
+      // focus, minimized or window)
   }
 });
 
@@ -71,11 +77,11 @@ The process-wide mouse-capture seam.
 | `environmentVariable` | `static const String environmentVariable = 'LUMINA_MOUSE_CAPTURE'` | Set to `off` (or `record`) to keep every capture away from the pointer. The test harnesses export it; the native plugin checks it too. |
 | `backend` | `static MouseCaptureBackend get backend` / `set backend(...)` | The backend every caller uses. The first read creates the default backend (and, for the platform backend, releases any capture a hot restart left behind); assigning one replaces it. |
 | `defaultBackendReason` | `static String? get defaultBackendReason` | Why the default backend was chosen, or null when one was assigned. |
-| `chooseDefault` | `static MouseCaptureBackendChoice chooseDefault({Map<String, String>? environment, bool? isTestBinding, TargetPlatform? platform, bool isWeb})` | The default rule: `LUMINA_MOUSE_CAPTURE=off` or `record` gives the recording backend; so does a Flutter test binding (`flutter test`, `integration_test`), the web, or any platform other than Linux; otherwise the platform channel. |
+| `chooseDefault` | `static MouseCaptureBackendChoice chooseDefault({Map<String, String>? environment, bool? isTestBinding, TargetPlatform? platform, bool isWeb})` | The default rule: `LUMINA_MOUSE_CAPTURE=off` or `record` gives the recording backend; so does a Flutter test binding (`flutter test`, `integration_test`), the web, or any platform other than Linux and Windows; otherwise the platform channel. |
 
 #### `class MouseCaptureBackendChoice`
 
-Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA_MOUSE_CAPTURE=off`, `web`, `not Linux` or `platform channel`), `usesPlatform`, and `createBackend()`, which returns a fresh backend of the chosen kind.
+Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA_MOUSE_CAPTURE=off`, `web`, `unsupported platform` or `platform channel`), `usesPlatform`, and `createBackend()`, which returns a fresh backend of the chosen kind.
 
 ### `lib/src/mouse_capture_backend.dart`
 
@@ -84,13 +90,13 @@ Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA
 | Member | Signature | Purpose |
 | :--- | :--- | :--- |
 | `support` | `Future<MouseCaptureSupport> support()` | What this backend can do on this machine. |
-| `capture` | `Future<bool> capture({Offset? centre})` | Captures the pointer. `centre` is in the Flutter view's logical coordinates: on X11 the pointer is warped there, on Wayland it is where the pointer reappears when released. Returns whether a capture was requested. |
+| `capture` | `Future<bool> capture({Offset? centre})` | Captures the pointer. `centre` is in the Flutter view's logical coordinates: on X11 the pointer is warped there, on Wayland it is where the pointer reappears when released, on Windows the cursor is held there (and returns to where it was on release). Returns whether a capture was requested. |
 | `release` | `Future<void> release()` | Releases the pointer; a no-op when not captured. |
 | `events` | `Stream<MouseCaptureEvent> get events` | Motion, lock confirmations and losses. |
 
 #### `enum MouseCaptureBackendKind`
 
-`wayland` (pointer constraints and relative pointer on GDK's connection), `x11` (seat grab with warp-to-centre), `unsupported` (no way to capture, or the plugin is not built into this app), `disabled` (the native side refused because `LUMINA_MOUSE_CAPTURE` is `off` or `record`), `recording` (requests are recorded, the pointer is never touched).
+`wayland` (pointer constraints and relative pointer on GDK's connection), `x11` (seat grab with warp-to-centre), `windows` (raw input with the cursor hidden and clipped to the capture centre), `unsupported` (no way to capture, or the plugin is not built into this app), `disabled` (the native side refused because `LUMINA_MOUSE_CAPTURE` is `off` or `record`), `recording` (requests are recorded, the pointer is never touched).
 
 #### `class MouseCaptureSupport`
 
@@ -100,13 +106,13 @@ Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA
 
 - `MouseCaptureMotion(dx, dy)`: the mouse moved by (`dx`, `dy`) logical pixels while captured, however far the held pointer is from any edge.
 - `MouseCaptureLocked()`: the platform confirmed the lock (Wayland's `locked` event).
-- `MouseCaptureLost()`: the capture ended without being asked: the window lost focus, the compositor broke the lock, or the window went away.
+- `MouseCaptureLost([String? reason])`: the capture ended without being asked: the window lost focus, the compositor broke the lock, or the window went away. `reason` is `focus`, `minimized` or `window` on Windows, null on Linux; it takes part in equality.
 
 ### `lib/src/method_channel_backend.dart`
 
 #### `class MethodChannelMouseCaptureBackend`
 
-The native Linux backend (`linux/lumina_mouse_capture_plugin.cc`). The `lumina_mouse_capture` method channel answers `support` with `{kind, pointerLock, relativeMotion, detail}`, `capture` with a bool (optional `{x, y}`), and `release`; the `lumina_mouse_capture/events` event channel sends `{type: motion, dx, dy}`, `{type: locked}` and `{type: lost}`. A missing plugin (an app that was not rebuilt, a platform without it) is reported as `unsupported`, never thrown.
+The native backend (`linux/lumina_mouse_capture_plugin.cc`, `windows/lumina_mouse_capture_plugin.cpp`). The `lumina_mouse_capture` method channel answers `support` with `{kind, pointerLock, relativeMotion, detail}`, `capture` with a bool (optional `{x, y}`), and `release`; the `lumina_mouse_capture/events` event channel sends `{type: motion, dx, dy}`, `{type: locked}` and `{type: lost}` (Windows adds `reason`). A missing plugin (an app that was not rebuilt, a platform without it) is reported as `unsupported`, never thrown.
 
 ### `lib/src/recording_backend.dart`
 
@@ -121,15 +127,25 @@ A backend that never touches the pointer: it records what was asked, and `emitMo
 | `lastCentre` | `Offset? lastCentre` | The centre of the last capture request. |
 | `isCaptured` | `bool get isCaptured` | Whether a capture is in force (requested and not released or lost). |
 | `emitMotion` | `void emitMotion(double dx, double dy)` | Reports a relative movement, as the compositor would. |
-| `emitLost` | `void emitLost()` | Reports that the capture was taken away (focus loss, Alt+Tab). |
+| `emitLost` | `void emitLost([String? reason])` | Reports that the capture was taken away (focus loss, Alt+Tab), with the platform's reason when given. |
 
 ## Development
 
 ```bash
-flutter test test/mouse_capture_test.dart
+flutter test test/mouse_capture_test.dart test/windows_native_test.dart
 ```
 
 `example/` captures the pointer through the real plugin (C captures at the window centre, F4 releases, a click captures again) and prints every capture event as a JSON line on stdout. `tool/nested_compositor/` checks the native side without touching the desktop: `nested_session.py` starts an isolated, headless GNOME Shell (private D-Bus, software rendering, input through Mutter's RemoteDesktop API), and `build_probe.sh` builds `capture_probe`, the capture core in a plain GTK window. The engine's input smoke test drives the example app inside the same nested session.
+
+On Windows, `test/windows_native_test.dart` builds `windows/test/` with CMake (from `PATH` or Visual Studio) and runs the capture state machine against a fake OS layer: the test executable does not link the Win32 layer, so it cannot clip, hide or move the pointer. `flutter build windows` in `example/` compiles the plugin. `example/integration_test/real_pointer_capture_test.dart` checks the real plugin on the real pointer and is opt-in only: it is skipped unless `LUMINA_MOUSE_CAPTURE_REAL_TEST=1`, and it is meant to be run by the person at the machine:
+
+```powershell
+cd example
+$env:LUMINA_MOUSE_CAPTURE_REAL_TEST = '1'
+flutter test integration_test/real_pointer_capture_test.dart -d windows --dart-define=LUMINA_MOUSE_CAPTURE_REAL_TEST=1
+```
+
+It prints each step (click the window, move the mouse, Alt+Tab away) and releases the pointer within 15 seconds of every capture.
 
 ---
 

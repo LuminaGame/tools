@@ -58,9 +58,10 @@ class RecordingMouseCaptureBackend implements MouseCaptureBackend {
   /// Reports a relative movement, as the compositor would.
   void emitMotion(double dx, double dy) => _events.add(MouseCaptureMotion(dx, dy));
 
-  /// Reports that the capture was taken away (focus loss, Alt+Tab).
-  void emitLost() {
+  /// Reports that the capture was taken away (focus loss, Alt+Tab), with the
+  /// platform's [reason] when it gives one.
+  void emitLost([String? reason]) {
     _captured = false;
-    _events.add(const MouseCaptureLost());
+    _events.add(MouseCaptureLost(reason));
   }
 }

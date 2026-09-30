@@ -3,9 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lumina_mouse_capture/lumina_mouse_capture.dart';
 
 /// The Dart half of the mouse-capture plugin. The
-/// native half is exercised for real by the nested-compositor smoke
-/// (`lumina/test/smoke/input_smoke_test.dart`); here the seam that keeps every
-/// test away from the user's pointer, and the wire format both halves share.
+/// Linux native half is exercised for real by the nested-compositor smoke
+/// (`lumina/test/smoke/input_smoke_test.dart`), the Windows one against a fake
+/// OS layer (`windows_native_test.dart`); here the seam that keeps every test
+/// away from the user's pointer, and the wire format the halves share.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -31,7 +32,7 @@ void main() {
       }
     });
 
-    test('the web and other platforms get the recording backend; Linux gets the platform channel', () {
+    test('the web and other platforms get the recording backend; Linux and Windows get the platform channel', () {
       expect(
         LuminaMouseCapture.chooseDefault(environment: const {}, isTestBinding: false, isWeb: true).reason,
         'web',
@@ -40,19 +41,34 @@ void main() {
         LuminaMouseCapture.chooseDefault(
           environment: const {},
           isTestBinding: false,
-          platform: TargetPlatform.windows,
+          platform: TargetPlatform.macOS,
           isWeb: false,
         ).reason,
-        'not Linux',
+        'unsupported platform',
       );
-      final linux = LuminaMouseCapture.chooseDefault(
-        environment: const {},
+      for (final platform in [TargetPlatform.linux, TargetPlatform.windows]) {
+        final choice = LuminaMouseCapture.chooseDefault(
+          environment: const {},
+          isTestBinding: false,
+          platform: platform,
+          isWeb: false,
+        );
+        expect(choice.reason, 'platform channel', reason: platform.name);
+        expect(choice.usesPlatform, isTrue);
+        expect(choice.createBackend(), isA<MethodChannelMouseCaptureBackend>());
+      }
+    });
+
+    test('LUMINA_MOUSE_CAPTURE=off keeps Windows on the recording backend', () {
+      final choice = LuminaMouseCapture.chooseDefault(
+        environment: const {'LUMINA_MOUSE_CAPTURE': 'off'},
         isTestBinding: false,
-        platform: TargetPlatform.linux,
+        platform: TargetPlatform.windows,
         isWeb: false,
       );
-      expect(linux.reason, 'platform channel');
-      expect(linux.createBackend(), isA<MethodChannelMouseCaptureBackend>());
+      expect(choice.reason, 'LUMINA_MOUSE_CAPTURE=off');
+      expect(choice.usesPlatform, isFalse);
+      expect(choice.createBackend(), isA<RecordingMouseCaptureBackend>());
     });
   });
 
@@ -143,6 +159,43 @@ void main() {
       expect(calls[1].arguments, {'x': 640.0, 'y': 360.0});
     });
 
+    test('the Windows plugin reports its kind, and a loss carries its reason', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannelMouseCaptureBackend.channel, (call) async {
+        return {'kind': 'windows', 'pointerLock': true, 'relativeMotion': true, 'detail': 'raw input'};
+      });
+      final backend = MethodChannelMouseCaptureBackend();
+      final support = await backend.support();
+      expect(support.kind, MouseCaptureBackendKind.windows);
+      expect(support.pointerLock, isTrue);
+      expect(support.relativeMotion, isTrue);
+
+      final events = <MouseCaptureEvent>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+        MethodChannelMouseCaptureBackend.eventChannel,
+        MockStreamHandler.inline(onListen: (args, sink) {
+          sink.success({'type': 'locked'});
+          sink.success({'type': 'motion', 'dx': 4.0, 'dy': 0.5});
+          sink.success({'type': 'lost', 'reason': 'focus'});
+          sink.success({'type': 'lost'});
+        }),
+      );
+      addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(MethodChannelMouseCaptureBackend.eventChannel, null));
+      final sub = backend.events.listen(events.add);
+      addTearDown(sub.cancel);
+      await pumpEventQueue();
+      expect(events, [
+        const MouseCaptureLocked(),
+        const MouseCaptureMotion(4, 0.5),
+        const MouseCaptureLost('focus'),
+        const MouseCaptureLost(),
+      ]);
+      expect((events[2] as MouseCaptureLost).reason, 'focus');
+      expect(events[2], isNot(const MouseCaptureLost()));
+    });
+
     test('a missing plugin is reported as unsupported, never thrown', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(MethodChannelMouseCaptureBackend.channel, null);
@@ -185,6 +238,9 @@ void main() {
     expect(const MouseCaptureMotion(1, 2), isNot(const MouseCaptureMotion(2, 1)));
     expect(const MouseCaptureMotion(1, 2).toString(), 'MouseCaptureMotion(1.0, 2.0)');
     expect(MouseCaptureBackendKind.x11.name, 'x11');
+    expect(MouseCaptureBackendKind.windows.name, 'windows');
+    expect(const MouseCaptureLost('minimized').toString(), 'MouseCaptureLost(minimized)');
+    expect(const MouseCaptureLost().toString(), 'MouseCaptureLost()');
   });
 
   test('the process-wide backend can be replaced and restored', () {

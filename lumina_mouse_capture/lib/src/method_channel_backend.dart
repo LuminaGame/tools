@@ -4,14 +4,15 @@ import 'package:flutter/services.dart';
 
 import 'mouse_capture_backend.dart';
 
-/// The native Linux backend (`linux/lumina_mouse_capture_plugin.cc`).
+/// The native backend: `linux/lumina_mouse_capture_plugin.cc` and
+/// `windows/lumina_mouse_capture_plugin.cpp`.
 ///
 /// Wire format:
 /// - `lumina_mouse_capture` method channel: `support` → `{kind, pointerLock,
 ///   relativeMotion, detail}`, `capture` `{x, y}` (optional) → bool,
 ///   `release` → null;
 /// - `lumina_mouse_capture/events` event channel: `{type: motion, dx, dy}`,
-///   `{type: locked}`, `{type: lost}`.
+///   `{type: locked}`, `{type: lost, reason}` (`reason` optional).
 ///
 /// A missing plugin (an app that was not rebuilt, a platform without it) is
 /// reported as [MouseCaptureBackendKind.unsupported], never thrown.
@@ -42,7 +43,8 @@ class MethodChannelMouseCaptureBackend implements MouseCaptureBackend {
       case 'locked':
         return const MouseCaptureLocked();
       case 'lost':
-        return const MouseCaptureLost();
+        final reason = message['reason'];
+        return MouseCaptureLost(reason is String ? reason : null);
     }
     return null;
   }

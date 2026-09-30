@@ -12,7 +12,7 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 | [`flutter_riglogic`](flutter_riglogic/) | Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi için Dart FFI binding'leri: MetaHuman `.dna` dosyalarını okur ve yüz rig'lerini hesaplar. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Sistemde kurulu GStreamer 1.x için saf Dart FFI binding'leri, run time'da yüklenir: pipeline'lar, PNG ya da RGBA frame'lerden VP8/WebM encode, media probe. Engine'in smoke test'leri videolarını bununla kaydeder. |
 | [`lumina_smoke`](lumina_smoke/) | Engine paketlerinin ortak smoke test sistemi: test adıyla eşleşen sidecar JSON'lu PNG ve VP8/WebM artifact'ler, smoke video kuralları (10 s, 1024×768, 30 fps) ve probe, frame recorder'lar, link'li HTML smoke raporunu yazan `flutter test` runner'ı. |
-| [`lumina_mouse_capture`](lumina_mouse_capture/) | Linux'ta relative motion ile pointer capture yapan Flutter plugin'i (Wayland pointer constraints, X11 grab ve warp); diğer platformlarda capture yapılmaz. |
+| [`lumina_mouse_capture`](lumina_mouse_capture/) | Linux'ta (Wayland pointer constraints, X11 grab ve warp) ve Windows'ta (raw input, clip edilmiş gizli imleç) relative motion ile pointer capture yapan Flutter plugin'i; diğer platformlarda capture yapılmaz. |
 
 İlgili repo'lar: [lumina](https://github.com/LuminaGame/lumina) (engine ve editor), [plugins](https://github.com/LuminaGame/plugins), [marketplace](https://github.com/LuminaGame/marketplace), [test-assets](https://github.com/LuminaGame/test-assets).
 

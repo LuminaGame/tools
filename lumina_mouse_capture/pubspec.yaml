@@ -1,5 +1,5 @@
 name: lumina_mouse_capture
-description: "Pointer capture for Lumina: a Linux pointer lock with relative motion (Wayland pointer constraints, X11 grab and warp), behind a seam that tests cannot bypass."
+description: "Pointer capture for Lumina: a pointer lock with relative motion on Linux (Wayland pointer constraints, X11 grab and warp) and Windows (raw input, clipped hidden cursor), behind a seam that tests cannot bypass."
 version: 0.0.1
 publish_to: none
 repository: https://github.com/LuminaGame/tools
@@ -23,3 +23,5 @@ flutter:
     platforms:
       linux:
         pluginClass: LuminaMouseCapturePlugin
+      windows:
+        pluginClass: LuminaMouseCapturePluginCApi

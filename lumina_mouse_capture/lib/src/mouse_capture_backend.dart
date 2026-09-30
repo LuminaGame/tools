@@ -8,6 +8,10 @@ enum MouseCaptureBackendKind {
   /// An X11 seat grab with warp-to-centre.
   x11,
 
+  /// Windows raw mouse input, with the cursor hidden and clipped to the
+  /// capture centre.
+  windows,
+
   /// The platform has no way to capture the pointer (or the plugin is not
   /// built into this app).
   unsupported,
@@ -89,16 +93,21 @@ final class MouseCaptureLocked extends MouseCaptureEvent {
 /// The capture ended without being asked: the window lost focus, the
 /// compositor broke the lock, or the window went away.
 final class MouseCaptureLost extends MouseCaptureEvent {
-  const MouseCaptureLost();
+  const MouseCaptureLost([this.reason]);
+
+  /// Why, when the platform says: `focus` (another window was activated),
+  /// `minimized` or `window` (the window went away). Null when the platform
+  /// gives no reason (Linux).
+  final String? reason;
 
   @override
-  bool operator ==(Object other) => other is MouseCaptureLost;
+  bool operator ==(Object other) => other is MouseCaptureLost && other.reason == reason;
 
   @override
-  int get hashCode => (MouseCaptureLost).hashCode;
+  int get hashCode => Object.hash(MouseCaptureLost, reason);
 
   @override
-  String toString() => 'MouseCaptureLost()';
+  String toString() => 'MouseCaptureLost(${reason ?? ''})';
 }
 
 /// Captures the pointer for a game: hidden, held in place, reporting motion.
@@ -108,7 +117,8 @@ abstract class MouseCaptureBackend {
 
   /// Captures the pointer. [centre] is in the Flutter view's logical
   /// coordinates: on X11 the pointer is warped there, on Wayland it is where
-  /// the pointer reappears when released. Returns whether a capture was
+  /// the pointer reappears when released, on Windows the cursor is held there
+  /// (and returns to where it was on release). Returns whether a capture was
   /// requested.
   Future<bool> capture({Offset? centre});
 

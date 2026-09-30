@@ -12,7 +12,7 @@ Documentation: [docs/README.md](docs/README.md).
 | [`flutter_riglogic`](flutter_riglogic/) | Dart FFI bindings to Epic Games' [OpenRigLogic](https://github.com/EpicGames/openriglogic): reads MetaHuman `.dna` files and evaluates facial rigs. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Pure-Dart FFI bindings to a system GStreamer 1.x install, loaded at run time: pipelines, VP8/WebM encoding from PNG or RGBA frames, media probing. The engine's smoke tests record their videos with it. |
 | [`lumina_smoke`](lumina_smoke/) | The engine packages' shared smoke-test system: PNG and VP8/WebM artifacts with sidecar JSON matched by test name, the smoke-video rules (10 s, 1024×768, 30 fps) and probe, frame recorders, and the `flutter test` runner that writes the linked HTML smoke report. |
-| [`lumina_mouse_capture`](lumina_mouse_capture/) | Flutter plugin for pointer capture on Linux (Wayland pointer constraints, X11 grab and warp) with relative motion; other platforms fall back to no capture. |
+| [`lumina_mouse_capture`](lumina_mouse_capture/) | Flutter plugin for pointer capture with relative motion on Linux (Wayland pointer constraints, X11 grab and warp) and Windows (raw input, clipped hidden cursor); other platforms fall back to no capture. |
 
 Related repositories: [lumina](https://github.com/LuminaGame/lumina) (engine and editor), [plugins](https://github.com/LuminaGame/plugins), [marketplace](https://github.com/LuminaGame/marketplace), [test-assets](https://github.com/LuminaGame/test-assets).
 

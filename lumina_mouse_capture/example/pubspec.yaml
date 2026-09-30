@@ -1,5 +1,5 @@
 name: lumina_mouse_capture_example
-description: "The nested-compositor check of lumina_mouse_capture (lumina todo/input/04): captures the pointer on start and logs every capture event."
+description: "Exercises lumina_mouse_capture through the real plugin: captures the pointer and logs every capture event (the nested-compositor check on Linux, the opt-in real-pointer test on Windows)."
 publish_to: 'none'
 
 environment:
@@ -14,5 +14,9 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
 
 flutter:
