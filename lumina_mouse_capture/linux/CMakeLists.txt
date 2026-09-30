@@ -1,4 +1,4 @@
-# lumina_mouse_capture (lumina todo/input/04): the Linux side of the plugin.
+# lumina_mouse_capture: the Linux side of the plugin.
 cmake_minimum_required(VERSION 3.10)
 
 set(PROJECT_NAME "lumina_mouse_capture")
