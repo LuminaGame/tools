@@ -28,10 +28,16 @@ bash tool/build_openriglogic.sh     # Linux: clang + bundled libc++, -fPIC -> th
 ```
 
 ```bat
-tool\build_openriglogic.bat         :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
+tool\build_openriglogic.bat                     :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
 ```
 
-The Linux script finds libc++ through `LUMINA_LIBCXX_DIR`, else `../../lumina/flutter_filament/third_party/libcxx`. The Windows script sets up the MSVC environment with `vswhere` when it is not already active.
+```bash
+# Android cross-compilation (arm64-v8a and x86_64; requires Android NDK):
+tool\build_openriglogic_android.bat [abi]       # Windows host -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
+bash tool/build_openriglogic_android.sh [abi]   # Linux host   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
+```
+
+The Linux script finds libc++ through `LUMINA_LIBCXX_DIR`, else `../../lumina/flutter_filament/third_party/libcxx`. The Windows script sets up the MSVC environment with `vswhere` when it is not already active. The Android scripts detect the Android NDK from `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT`, or the default SDK NDK location, using `libc++_shared` and clang.
 
 ## Where the hook finds its inputs
 

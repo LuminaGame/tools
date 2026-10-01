@@ -13,17 +13,22 @@ void main() {
   late Uri defined;
 
   String slash(String path) => path.replaceAll(r'\', '/');
-  String dir(Uri uri) => slash(Directory.fromUri(uri).path).replaceAll(RegExp(r'/$'), '');
-  void build(Uri folder) => File.fromUri(folder.resolve(lib)).createSync(recursive: true);
+  String dir(Uri uri) =>
+      slash(Directory.fromUri(uri).path).replaceAll(RegExp(r'/$'), '');
+  void build(Uri folder) =>
+      File.fromUri(folder.resolve(lib)).createSync(recursive: true);
 
   setUp(() {
     temp = Directory.systemTemp.createTempSync('riglogic_lib_dir_');
-    packageDefault = Directory('${temp.path}/package/third_party/openriglogic/lib/').uri;
+    packageDefault = Directory(
+      '${temp.path}/package/third_party/openriglogic/lib/',
+    ).uri;
     defined = Directory('${temp.path}/app/openriglogic/lib/').uri;
   });
   tearDown(() => temp.deleteSync(recursive: true));
 
-  String resolve({String? environment, Uri? userDefine}) => resolveRiglogicLibDir(
+  String resolve({String? environment, Uri? userDefine}) =>
+      resolveRiglogicLibDir(
         environment: environment,
         userDefine: userDefine,
         packageDefault: packageDefault,
@@ -54,6 +59,23 @@ void main() {
   });
 
   test('a drive-letter user-define reads back as a Windows path', () {
-    expect(riglogicDirPath(Uri.parse('D:/openriglogic/lib/')), 'D:/openriglogic/lib');
+    expect(
+      riglogicDirPath(Uri.parse('D:/openriglogic/lib/')),
+      'D:/openriglogic/lib',
+    );
+  });
+
+  test('resolves Android ABI subfolder when present', () {
+    final androidFolder = packageDefault.resolve('android/arm64-v8a/');
+    File.fromUri(
+      androidFolder.resolve('libriglogic.a'),
+    ).createSync(recursive: true);
+
+    final resolved = resolveRiglogicLibDir(
+      packageDefault: packageDefault,
+      staticLib: 'libriglogic.a',
+      androidAbi: 'arm64-v8a',
+    );
+    expect(resolved, dir(packageDefault));
   });
 }

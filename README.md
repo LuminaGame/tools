@@ -65,8 +65,10 @@ How to build and patch Filament is documented in the [lumina](https://github.com
 `flutter_riglogic` links a static OpenRigLogic library built from the vendored sources in `flutter_riglogic/third_party/openriglogic`:
 
 ```bash
-bash flutter_riglogic/tool/build_openriglogic.sh      # Linux  -> third_party/openriglogic/lib/libriglogic.a
-flutter_riglogic\tool\build_openriglogic.bat          # Windows -> third_party\openriglogic\lib\riglogic.lib
+bash flutter_riglogic/tool/build_openriglogic.sh              # Linux   -> third_party/openriglogic/lib/libriglogic.a
+flutter_riglogic\tool\build_openriglogic.bat                  # Windows -> third_party\openriglogic\lib\riglogic.lib
+flutter_riglogic\tool\build_openriglogic_android.bat [abi]    # Android (Windows host) -> third_party\openriglogic\lib\android\<abi>\libriglogic.a
+bash flutter_riglogic/tool/build_openriglogic_android.sh [abi]# Android (Linux host)   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
 ```
 
 ### Native-assets hook settings

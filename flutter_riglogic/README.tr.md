@@ -28,10 +28,16 @@ bash tool/build_openriglogic.sh     # Linux: clang + bundled libc++, -fPIC -> th
 ```
 
 ```bat
-tool\build_openriglogic.bat         :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
+tool\build_openriglogic.bat                     :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
 ```
 
-Linux script'i libc++'ı `LUMINA_LIBCXX_DIR` üzerinden, yoksa `../../lumina/flutter_filament/third_party/libcxx` altında bulur. Windows script'i MSVC environment'ı aktif değilse `vswhere` ile kurar.
+```bash
+# Android cross-compilation (arm64-v8a ve x86_64; Android NDK gerektirir):
+tool\build_openriglogic_android.bat [abi]       # Windows host -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
+bash tool/build_openriglogic_android.sh [abi]   # Linux host   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
+```
+
+Linux script'i libc++'ı `LUMINA_LIBCXX_DIR` üzerinden, yoksa `../../lumina/flutter_filament/third_party/libcxx` altında bulur. Windows script'i MSVC environment'ı aktif değilse `vswhere` ile kurar. Android script'leri Android NDK'yı `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` veya standart SDK NDK dizininden tespit ederek `libc++_shared` ve clang ile derleme yapar.
 
 ## Hook input'larını nerede bulur
 

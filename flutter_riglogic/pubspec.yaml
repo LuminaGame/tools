@@ -24,8 +24,8 @@ flutter:
         ffiPlugin: true
       macos:
         ffiPlugin: true
-      # Windows needs no plugin entry: the native-assets hook builds and
-      # bundles flutter_riglogic.dll, and there is no windows/ plugin folder.
+      # Windows and Android need no plugin entry: the native-assets hook builds and
+      # bundles flutter_riglogic.{dll,so}, and there is no windows/ or android/ plugin folder.
 
 dev_dependencies:
   ffigen: ^20.1.1

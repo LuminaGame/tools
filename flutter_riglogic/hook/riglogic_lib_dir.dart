@@ -20,14 +20,22 @@ String resolveRiglogicLibDir({
   Uri? userDefine,
   required Uri packageDefault,
   required String staticLib,
+  String? androidAbi,
   bool Function(String path)? exists,
 }) {
-  if (environment != null && environment.isNotEmpty) return riglogicDirPath(Uri.directory(environment));
+  if (environment != null && environment.isNotEmpty)
+    return riglogicDirPath(Uri.directory(environment));
   final found = exists ?? (path) => File(path).existsSync();
   final defaultDir = riglogicDirPath(packageDefault);
+  final libSubpath = androidAbi != null
+      ? 'android/$androidAbi/$staticLib'
+      : staticLib;
   if (userDefine != null) {
     final defined = riglogicDirPath(userDefine);
-    if (found('$defined/$staticLib') || !found('$defaultDir/$staticLib')) return defined;
+    if (found('$defined/$libSubpath') ||
+        found('$defined/$staticLib') ||
+        !found('$defaultDir/$libSubpath'))
+      return defined;
   }
   return defaultDir;
 }
@@ -40,4 +48,6 @@ String riglogicDirPath(Uri uri) {
 
 /// A user-define such as `D:/openriglogic/lib` resolves to a URI whose scheme
 /// is the drive letter; read it back as that Windows path.
-String _filePath(Uri uri) => uri.scheme.length == 1 ? '${uri.scheme.toUpperCase()}:${uri.path}' : uri.toFilePath();
+String _filePath(Uri uri) => uri.scheme.length == 1
+    ? '${uri.scheme.toUpperCase()}:${uri.path}'
+    : uri.toFilePath();
