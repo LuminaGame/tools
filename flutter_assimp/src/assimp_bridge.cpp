@@ -17,6 +17,13 @@
 #include <string>
 #include <vector>
 
+namespace Assimp {
+class IOSystem;
+// The glTF 2 binary exporter's entry point (glTF2Exporter.cpp, Assimp's
+// "glb2" format), registered again below so it runs once per export.
+void ExportSceneGLB2(const char*, IOSystem*, const aiScene*, const ExportProperties*);
+}  // namespace Assimp
+
 #ifdef FLUTTER_ASSIMP_EXTRA_IMPORTERS
 // Importers Filament's Assimp build leaves out, compiled by the hook from the
 // same checkout.
@@ -679,6 +686,28 @@ void configure(Assimp::Importer& importer) {
 #endif
 }
 
+// Assimp 5.0's Exporter::Export runs the export function twice on the same
+// scene copy, and the glTF 2 exporter flips V (1 - v) in place on that copy:
+// the second run flips it back and overwrites the file, so every GLB came out
+// with the source's V-up texture coordinates. "glb2-once" is the "glb2"
+// exporter with the same pre-processing that writes on the first run only.
+const char* const kGlbFormat = "glb2-once";
+thread_local bool t_glb_written = false;
+
+void exportGlbOnce(const char* path, Assimp::IOSystem* io, const aiScene* scene,
+                   const Assimp::ExportProperties* properties) {
+    if (t_glb_written) return;
+    t_glb_written = true;
+    Assimp::ExportSceneGLB2(path, io, scene, properties);
+}
+
+void registerGlbExporter(Assimp::Exporter& exporter) {
+    exporter.RegisterExporter(Assimp::Exporter::ExportFormatEntry(
+        kGlbFormat, "GL Transmission Format v. 2 (binary), written once", "glb", &exportGlbOnce,
+        aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_SortByPType));
+    t_glb_written = false;
+}
+
 }  // namespace
 
 extern "C" {
@@ -749,7 +778,8 @@ ASSIMP_EXPORT int assimp_convert_file_to_glb_ex(
     processScene(scene.get(), options);
 
     Assimp::Exporter exporter;
-    aiReturn ret = exporter.Export(scene.get(), "glb2", output_path);
+    registerGlbExporter(exporter);
+    aiReturn ret = exporter.Export(scene.get(), kGlbFormat, output_path);
     if (ret != aiReturn_SUCCESS) {
         lastError() = exporter.GetErrorString();
         return 0;
@@ -791,7 +821,8 @@ ASSIMP_EXPORT int assimp_convert_memory_to_glb_ex(
     processScene(scene.get(), options);
 
     Assimp::Exporter exporter;
-    const aiExportDataBlob* blob = exporter.ExportToBlob(scene.get(), "glb2");
+    registerGlbExporter(exporter);
+    const aiExportDataBlob* blob = exporter.ExportToBlob(scene.get(), kGlbFormat);
     if (!blob) {
         lastError() = exporter.GetErrorString();
         return 0;

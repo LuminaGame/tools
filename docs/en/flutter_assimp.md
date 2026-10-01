@@ -4,6 +4,8 @@
 
 `flutter_assimp` binds the Open Asset Import Library (Assimp) through Dart FFI and converts FBX, OBJ, Collada (DAE), 3DS, PLY, DirectX (X) and STL files, on disk or in memory, into binary glTF 2.0 (`.glb`), the format the Lumina engine loads. File paths are relative to the `flutter_assimp/` package directory.
 
+Texture coordinates come out in glTF's convention (v = 0 at the top of the image): the V-up coordinates of FBX, OBJ, Collada and the other formats are written as `1 - v`, on every UV set and for every conversion (file or memory). Assimp 5.0's `Exporter::Export` runs an exporter twice on the same scene copy, and its glTF exporter flips V in place, so the bridge registers that exporter once more as `glb2-once`, which writes on the first run only; the plain `glb2` entry would hand back the source's V-up coordinates when converting to a file. A GLB converted before this fix holds V-up coordinates and draws its textures upside down; convert (import) the source again.
+
 **On this page:**
 
 - [Native C bridge](#native-c-bridge)

@@ -4,6 +4,8 @@
 
 `flutter_assimp`, Open Asset Import Library'yi (Assimp) Dart FFI ile bağlar ve FBX, OBJ, Collada (DAE), 3DS, PLY, DirectX (X) ve STL dosyalarını diskte ya da bellekte, Lumina engine'inin yüklediği format olan binary glTF 2.0'a (`.glb`) dönüştürür. Dosya yolları `flutter_assimp/` paket dizinine görelidir.
 
+Doku koordinatları glTF kuralıyla çıkar (v = 0 görüntünün üstünde): FBX, OBJ, Collada ve diğer formatların V-yukarı koordinatları her UV setinde ve her dönüşümde (dosya ya da bellek) `1 - v` olarak yazılır. Assimp 5.0'ın `Exporter::Export`'u bir exporter'ı aynı sahne kopyası üzerinde iki kez çalıştırır ve glTF exporter'ı V'yi yerinde çevirir; bu yüzden köprü o exporter'ı `glb2-once` adıyla bir kez daha kaydeder ve yalnızca ilk çalıştırmada yazar. Düz `glb2` girişi dosyaya dönüştürürken kaynağın V-yukarı koordinatlarını geri verirdi. Bu düzeltmeden önce dönüştürülmüş bir GLB V-yukarı koordinatlar taşır ve dokularını ters çizer; kaynağı yeniden dönüştürün (içe aktarın).
+
 **Bu sayfada:**
 
 - [Native C köprüsü](#native-c-köprüsü)
