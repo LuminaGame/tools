@@ -2,7 +2,7 @@
 
 # flutter_assimp
 
-In-process 3D model dönüşümü için [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) Dart FFI binding'leri. Küçük bir C bridge (`src/assimp_bridge.cpp`) modeli Assimp ile yükler ve glTF 2.0 binary (GLB) olarak yazar. Lumina bunu FBX, OBJ, DAE ve diğer formatları GLB tabanlı asset pipeline'ına import etmek için kullanır.
+In-process 3D model dönüşümü için [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) Dart FFI binding'leri. Küçük bir C bridge (`src/assimp_bridge.cpp`) modeli Assimp ile yükler ve glTF 2.0 binary (GLB) olarak yazar. Lumina bunu FBX, OBJ, Collada (DAE), 3DS, PLY, DirectX (X) ve STL dosyalarını GLB tabanlı asset pipeline'ına import etmek için kullanır.
 
 Bridge, paketin native assets hook'u (`hook/build.dart`) tarafından ilk `flutter run` / `flutter test` sırasında derlenir; elle yapılacak bir build adımı yoktur. Assimp'i kendisi build etmez, bir Google Filament build'indeki Assimp kütüphanesini link eder.
 
@@ -11,7 +11,7 @@ Platformlar: Linux ve Windows (hook'ta bir macOS dalı da var).
 ## Gereksinimler
 
 - Prebuilt **Google Filament v1.77.0** ([lumina](https://github.com/LuminaGame/lumina) repo'sunda anlatılan local patch'lerle). Hook şunları kullanır:
-  - `<filament>/third_party/libassimp` içindeki Assimp kaynakları ve header'ları;
+  - `<filament>/third_party/libassimp` içindeki Assimp kaynakları ve header'ları: Filament'in Assimp kütüphanesinde yalnız FBX ve OBJ importer'ları vardır, bu yüzden hook Collada, 3DS, PLY, DirectX ve STL importer'larını da (`contrib/irrXML`, `contrib/unzip` ve `third_party/libz` header'larıyla) `third_party/libassimp/code` klasöründen, kaynaklar oradaysa derler; yoksa bridge yalnız FBX ve OBJ okur;
   - Linux / macOS: `<filament>/out/cmake-release/third_party/libassimp/tnt/libassimp.a` ve `third_party/zstd/tnt/libzstd.a`;
   - Windows: `<filament>/out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib`, `zstd/tnt/zstd.lib`, `libz/tnt/z.lib`.
 - Linux: clang ve lumina repo'sundaki bundled libc++ (`flutter_filament/third_party/libcxx`).
@@ -70,7 +70,7 @@ if (result.success) {
 // Bellekte; `hint` kaynak formatın uzantısıdır.
 final glb = await FlutterAssimp.convertMemoryToGlb(bytes, hint: 'obj');
 
-FlutterAssimp.isSupportedFormat('model.dae'); // true
+FlutterAssimp.isSupportedFormat('model.dae'); // true: FlutterAssimp.importExtensions'tan biri
 ```
 
 `AssimpConvertOptions`:

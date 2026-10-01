@@ -2,7 +2,7 @@
 
 # flutter_assimp
 
-Dart FFI bindings to the [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) for in-process 3D model conversion. A small C bridge (`src/assimp_bridge.cpp`) loads a model with Assimp and writes glTF 2.0 binary (GLB). Lumina uses it to import FBX, OBJ, DAE and other formats into its GLB-based asset pipeline.
+Dart FFI bindings to the [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) for in-process 3D model conversion. A small C bridge (`src/assimp_bridge.cpp`) loads a model with Assimp and writes glTF 2.0 binary (GLB). Lumina uses it to import FBX, OBJ, Collada (DAE), 3DS, PLY, DirectX (X) and STL files into its GLB-based asset pipeline.
 
 The bridge is compiled by the package's native-assets hook (`hook/build.dart`) on the first `flutter run` / `flutter test`; there is no manual build step. It links the Assimp library of a Google Filament build instead of building Assimp itself.
 
@@ -11,7 +11,7 @@ Platforms: Linux and Windows (the hook also has a macOS branch).
 ## Requirements
 
 - A prebuilt **Google Filament v1.77.0** (with the local patches documented in the [lumina](https://github.com/LuminaGame/lumina) repository). The hook uses:
-  - the Assimp sources and headers in `<filament>/third_party/libassimp`;
+  - the Assimp sources and headers in `<filament>/third_party/libassimp`: Filament's Assimp library has only the FBX and OBJ importers, so the hook also compiles the Collada, 3DS, PLY, DirectX and STL importers from `third_party/libassimp/code` (with `contrib/irrXML`, `contrib/unzip` and `third_party/libz` headers) when those sources are there; without them the bridge reads FBX and OBJ only;
   - Linux / macOS: `<filament>/out/cmake-release/third_party/libassimp/tnt/libassimp.a` and `third_party/zstd/tnt/libzstd.a`;
   - Windows: `<filament>/out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib`, `zstd/tnt/zstd.lib`, `libz/tnt/z.lib`.
 - Linux: clang and the bundled libc++ from the lumina repository (`flutter_filament/third_party/libcxx`).
@@ -70,7 +70,7 @@ if (result.success) {
 // In memory; `hint` is the source format's extension.
 final glb = await FlutterAssimp.convertMemoryToGlb(bytes, hint: 'obj');
 
-FlutterAssimp.isSupportedFormat('model.dae'); // true
+FlutterAssimp.isSupportedFormat('model.dae'); // true: one of FlutterAssimp.importExtensions
 ```
 
 `AssimpConvertOptions`:

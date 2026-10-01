@@ -36,6 +36,10 @@ ASSIMP_EXPORT const char* assimp_get_last_error();
 /// collision hulls and scene counts. "{}" before the first one.
 ASSIMP_EXPORT const char* assimp_get_last_report();
 
+/// The file extensions the bridge imports, as Assimp lists them:
+/// "*.fbx;*.obj;*.dae;…".
+ASSIMP_EXPORT const char* assimp_get_import_extensions();
+
 ASSIMP_EXPORT int assimp_convert_file_to_glb(
     const char* input_path,
     const char* output_path,

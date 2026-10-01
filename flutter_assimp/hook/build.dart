@@ -18,6 +18,23 @@ void main(List<String> args) async {
     // cl.exe runs in the hook's output directory, so Windows link inputs are
     // absolute; they come from Filament's MSVC build.
     String windowsLib(String path) => '$filament/out/cmake-release-windows/$path';
+    // Filament builds Assimp with only its OBJ and FBX importers; the
+    // Collada, 3DS, PLY, DirectX and STL importers are compiled here from the
+    // same checkout and registered by the bridge. A Filament folder without
+    // those sources (an older prebuilt archive) builds the bridge without them.
+    final extraImporterSources = [
+      '$filament/third_party/libassimp/code/Collada/ColladaLoader.cpp',
+      '$filament/third_party/libassimp/code/Collada/ColladaParser.cpp',
+      '$filament/third_party/libassimp/code/Common/ZipArchiveIOSystem.cpp',
+      '$filament/third_party/libassimp/code/3DS/3DSLoader.cpp',
+      '$filament/third_party/libassimp/code/3DS/3DSConverter.cpp',
+      '$filament/third_party/libassimp/code/Ply/PlyLoader.cpp',
+      '$filament/third_party/libassimp/code/Ply/PlyParser.cpp',
+      '$filament/third_party/libassimp/code/X/XFileImporter.cpp',
+      '$filament/third_party/libassimp/code/X/XFileParser.cpp',
+      '$filament/third_party/libassimp/code/STL/STLLoader.cpp',
+    ];
+    final extraImporters = extraImporterSources.every((s) => File(s).existsSync());
     final cbuilder = CBuilder.library(
       name: packageName,
       assetName: 'src/third_party/assimp_c.g.dart',
@@ -26,13 +43,26 @@ void main(List<String> args) async {
         'src/assimp_exporters_stub.cpp',
         '$filament/third_party/libassimp/code/glTF/glTFCommon.cpp',
         '$filament/third_party/libassimp/code/glTF2/glTF2Exporter.cpp',
+        if (extraImporters) ...extraImporterSources,
       ],
       includes: [
         'src',
         '$filament/third_party/libassimp/include',
         '$filament/third_party/libassimp/code',
         '$filament/third_party/libassimp/contrib/rapidjson/include',
+        if (extraImporters) ...[
+          '$filament/third_party/libassimp/contrib/irrXML',
+          '$filament/third_party/libassimp/contrib/unzip',
+          '$filament/third_party/libz',
+        ],
       ],
+      defines: {
+        if (extraImporters) ...{
+          'FLUTTER_ASSIMP_EXTRA_IMPORTERS': null,
+          // zlib (compressed .x, zipped .zae) is Filament's libz.
+          'ASSIMP_BUILD_NO_OWN_ZLIB': null,
+        },
+      },
       flags: [
         if (targetOS == OS.windows)
           ...['/std:c++20', '/EHsc', '/utf-8', '/bigobj', '/W0', '/MT', '/DNOMINMAX', '/D_CRT_SECURE_NO_WARNINGS']

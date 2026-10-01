@@ -26,6 +26,11 @@ external ffi.Pointer<ffi.Char> assimp_get_last_error();
 @ffi.Native<ffi.Pointer<ffi.Char> Function()>()
 external ffi.Pointer<ffi.Char> assimp_get_last_report();
 
+/// The file extensions the bridge imports, as Assimp lists them:
+/// "*.fbx;*.obj;*.dae;…".
+@ffi.Native<ffi.Pointer<ffi.Char> Function()>()
+external ffi.Pointer<ffi.Char> assimp_get_import_extensions();
+
 @ffi.Native<
   ffi.Int Function(
     ffi.Pointer<ffi.Char>,

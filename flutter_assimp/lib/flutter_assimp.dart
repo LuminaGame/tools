@@ -48,7 +48,7 @@ class FlutterAssimp {
 
   /// Converts a 3D model file on disk directly to a glTF 2.0 binary file (`.glb`).
   ///
-  /// Supports `.fbx`, `.obj`, `.dae`, `.stl`, `.blend`, `.3ds`, `.ply`, and all Assimp formats.
+  /// Reads the formats of [importExtensions].
   static Future<bool> convertFileToGlb(
     String inputPath,
     String outputPath, {
@@ -158,54 +158,29 @@ class FlutterAssimp {
     }
   }
 
-  /// Checks if a file path or extension is a supported 3D import format.
+  /// The formats this package builds the bridge to read, for when the
+  /// bridge cannot be asked ([importExtensions]).
+  static const Set<String> _builtInExtensions = {'fbx', 'obj', 'dae', 'zae', '3ds', 'prj', 'ply', 'x', 'stl'};
+
+  /// The lower-case file extensions (no dot) the loaded bridge imports: FBX
+  /// and OBJ, plus Collada, 3DS, PLY, DirectX and STL when the Filament
+  /// checkout the hook built from has their sources.
+  static Set<String> get importExtensions => _importExtensions ??= () {
+        final list = _bindings.getImportExtensions();
+        if (list == null) return _builtInExtensions;
+        return {
+          for (final e in list.split(';'))
+            if (e.trim().replaceFirst('*.', '').isNotEmpty) e.trim().replaceFirst('*.', '').toLowerCase(),
+        };
+      }();
+  static Set<String>? _importExtensions;
+
+  /// Whether [pathOrExtension] (a path, `.ext` or `ext`) is a 3D format the
+  /// bridge imports ([importExtensions]).
   static bool isSupportedFormat(String pathOrExtension) {
     final ext = pathOrExtension.contains('.')
-        ? pathOrExtension.substring(pathOrExtension.lastIndexOf('.')).toLowerCase()
-        : '.$pathOrExtension'.toLowerCase();
-
-    const supported = {
-      '.fbx',
-      '.obj',
-      '.dae',
-      '.stl',
-      '.blend',
-      '.3ds',
-      '.ase',
-      '.ply',
-      '.dxf',
-      '.lwo',
-      '.lws',
-      '.lxo',
-      '.ac',
-      '.ms3d',
-      '.cob',
-      '.scn',
-      '.bvh',
-      '.csm',
-      '.xml',
-      '.irrmesh',
-      '.irr',
-      '.mdl',
-      '.md2',
-      '.md3',
-      '.pk3',
-      '.mdc',
-      '.md5mesh',
-      '.smd',
-      '.vta',
-      '.ogex',
-      '.3d',
-      '.b3d',
-      '.q3d',
-      '.q3s',
-      '.nff',
-      '.off',
-      '.raw',
-      '.ter',
-      '.hmp',
-      '.ndo',
-    };
-    return supported.contains(ext);
+        ? pathOrExtension.substring(pathOrExtension.lastIndexOf('.') + 1).toLowerCase()
+        : pathOrExtension.toLowerCase();
+    return importExtensions.contains(ext);
   }
 }

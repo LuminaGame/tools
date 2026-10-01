@@ -62,6 +62,7 @@ class AssimpBindings {
   late final _StringFnDart _getVersion;
   late final _StringFnDart _getLastError;
   late final _StringFnDart _getLastReport;
+  _StringFnDart? _getImportExtensions;
   late final _ConvertFileDart _convertFileToGlb;
   late final _ConvertFileExDart _convertFileToGlbEx;
   late final _ConvertMemoryDart _convertMemoryToGlb;
@@ -86,6 +87,7 @@ class AssimpBindings {
     _getVersion = () => native.assimp_get_version();
     _getLastError = () => native.assimp_get_last_error();
     _getLastReport = () => native.assimp_get_last_report();
+    _getImportExtensions = () => native.assimp_get_import_extensions();
     _convertFileToGlb = (a, b, f) => native.assimp_convert_file_to_glb(a, b, f);
     _convertFileToGlbEx = (a, b, f, o) => native.assimp_convert_file_to_glb_ex(a, b, f, o);
     _convertMemoryToGlb = (a, n, h, ob, ol, f) => native.assimp_convert_memory_to_glb(a, n, h, ob, ol, f);
@@ -119,6 +121,9 @@ class AssimpBindings {
       } catch (_) {
         _hasEx = false;
       }
+      try {
+        _getImportExtensions = dylib.lookupFunction<_StringFnNative, _StringFnDart>('assimp_get_import_extensions');
+      } catch (_) {}
     } catch (e) {
       _isAvailable = false;
     }
@@ -166,6 +171,14 @@ class AssimpBindings {
   String getLastError() {
     if (!_isAvailable) return 'Assimp FFI Unavailable';
     return _getLastError().cast<Utf8>().toDartString();
+  }
+
+  /// The extensions the loaded library imports (`"*.fbx;*.obj;…"`), or null
+  /// when it is not loaded or predates the query.
+  String? getImportExtensions() {
+    final fn = _getImportExtensions;
+    if (!_isAvailable || fn == null) return null;
+    return fn().cast<Utf8>().toDartString();
   }
 
   /// The JSON report of this thread's last `_ex` conversion ("{}" if none).

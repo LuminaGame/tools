@@ -17,6 +17,16 @@
 #include <string>
 #include <vector>
 
+#ifdef FLUTTER_ASSIMP_EXTRA_IMPORTERS
+// Importers Filament's Assimp build leaves out, compiled by the hook from the
+// same checkout.
+#include "Collada/ColladaLoader.h"
+#include "3DS/3DSLoader.h"
+#include "Ply/PlyLoader.h"
+#include "X/XFileImporter.h"
+#include "STL/STLLoader.h"
+#endif
+
 // Per-thread strings behind trivially destructible thread_local pointers: a
 // thread_local std::string would need __cxa_thread_atexit, which the static
 // libc++abi is linked in without (the hook lists it before this object).
@@ -659,6 +669,14 @@ void configure(Assimp::Importer& importer) {
     // Pivot helper nodes ("<bone>_$AssimpFbx$_Rotation", …) would rename the
     // bones animations target; bake pivots into the node transforms instead.
     importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+#ifdef FLUTTER_ASSIMP_EXTRA_IMPORTERS
+    // The importer owns (and deletes) what it is given.
+    importer.RegisterLoader(new Assimp::ColladaLoader());
+    importer.RegisterLoader(new Assimp::Discreet3DSImporter());
+    importer.RegisterLoader(new Assimp::PLYImporter());
+    importer.RegisterLoader(new Assimp::XFileImporter());
+    importer.RegisterLoader(new Assimp::STLImporter());
+#endif
 }
 
 }  // namespace
@@ -682,6 +700,17 @@ ASSIMP_EXPORT const char* assimp_get_last_error() {
 
 ASSIMP_EXPORT const char* assimp_get_last_report() {
     return lastReport().c_str();
+}
+
+ASSIMP_EXPORT const char* assimp_get_import_extensions() {
+    static std::string list = [] {
+        Assimp::Importer importer;
+        configure(importer);
+        std::string out;
+        importer.GetExtensionList(out);
+        return out;
+    }();
+    return list.c_str();
 }
 
 ASSIMP_EXPORT void assimp_free_blob(uint8_t* blob) {
