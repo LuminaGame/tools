@@ -9,6 +9,7 @@ environment:
 workspace:
   - flutter_assimp
   - flutter_gstreamer
+  - flutter_kimodo
   - flutter_riglogic
   - flutter_riglogic/example
   - lumina_mouse_capture
@@ -24,6 +25,7 @@ dev_dependencies:
 # git sets them in its own root pubspec (see lumina's).
 #   flutter_assimp:   filament_dir (Filament checkout with out/cmake-release*)
 #   flutter_riglogic: riglogic_lib_dir (built OpenRigLogic static library)
+#   flutter_kimodo:   kimodo_dir (unpacked kimodo prebuilt, tool/build_kimodo.*)
 #   both, Linux:      libcxx_dir (flutter_filament/third_party/libcxx)
 hooks:
   user_defines:

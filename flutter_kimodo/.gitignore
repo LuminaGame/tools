@@ -1,0 +1,5 @@
+.dart_tool/
+build/
+# kimodo.cpp checkout, CMake build, archives and the unpacked prebuilt
+# (tool/build_kimodo.*, tool/fetch_prebuilt.dart).
+third_party/kimodo/

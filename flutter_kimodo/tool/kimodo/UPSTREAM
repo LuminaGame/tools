@@ -1,0 +1,5 @@
+# The kimodo.cpp commit the prebuilt is built from (tool/build_kimodo.*).
+# Bump tool/kimodo/VERSION (its -lumina.N suffix) whenever this, the build
+# flags or the toolchain change.
+repository=https://github.com/localai-org/kimodo.cpp
+commit=5679ff19ba0a522c0b0516e9a9d402fe1af2c027
