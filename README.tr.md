@@ -9,6 +9,7 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 | Paket | Ne işe yarar |
 |---|---|
 | [`flutter_assimp`](flutter_assimp/) | [Assimp](https://github.com/assimp/assimp) için Dart FFI binding'leri: FBX, OBJ, DAE, 3DS, Blend ve diğer formatları glTF 2.0 binary'ye (GLB) çevirir. Assimp kütüphanesini bir Filament build'inden link eder. |
+| [`flutter_kimodo`](flutter_kimodo/) | [kimodo.cpp](https://github.com/localai-org/kimodo.cpp) için Dart FFI binding'leri: NVIDIA Kimodo ile metinden hareket üretimi (GGUF ağırlıklar, CPU ve Vulkan), arka plan isolate'inde. |
 | [`flutter_riglogic`](flutter_riglogic/) | Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi için Dart FFI binding'leri: MetaHuman `.dna` dosyalarını okur ve yüz rig'lerini hesaplar. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Sistemde kurulu GStreamer 1.x için saf Dart FFI binding'leri, run time'da yüklenir: pipeline'lar, PNG ya da RGBA frame'lerden VP8/WebM encode, media probe. Engine'in smoke test'leri videolarını bununla kaydeder. |
 | [`lumina_smoke`](lumina_smoke/) | Engine paketlerinin ortak smoke test sistemi: test adıyla eşleşen sidecar JSON'lu PNG ve VP8/WebM artifact'ler, smoke video kuralları (10 s, 1024×768, 30 fps) ve probe, frame recorder'lar, link'li HTML smoke raporunu yazan `flutter test` runner'ı. |
@@ -70,6 +71,18 @@ flutter_riglogic\tool\build_openriglogic.bat                  # Windows -> third
 flutter_riglogic\tool\build_openriglogic_android.bat [abi]    # Android (Windows host) -> third_party\openriglogic\lib\android\<abi>\libriglogic.a
 bash flutter_riglogic/tool/build_openriglogic_android.sh [abi]# Android (Linux host)   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
 ```
+
+### kimodo.cpp
+
+`flutter_kimodo`, `flutter_kimodo/tool/kimodo/UPSTREAM` dosyasında sabitlenen commit'ten build edilen hazır bir kimodo.cpp (kimodo + ggml paylaşımlı kütüphaneleri) paketler:
+
+```bash
+powershell -ExecutionPolicy Bypass -File flutter_kimodo\tool\build_kimodo.ps1   # Windows: VS 2022; Vulkan SDK kuruluysa Vulkan
+bash flutter_kimodo/tool/build_kimodo.sh                                      # Linux
+dart run flutter_kimodo/tool/fetch_prebuilt.dart                              # yerel ya da yayınlanmış arşivi açar
+```
+
+Ayrıntılar: [docs/tr/flutter_kimodo.md](docs/tr/flutter_kimodo.md).
 
 ### Native assets hook ayarları
 

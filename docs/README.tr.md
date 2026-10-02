@@ -14,6 +14,7 @@ Bu, tools repository'sinin referans dokümantasyonudur: Lumina oyun motorunun ve
 
 - [flutter_assimp](tr/flutter_assimp.md) - Assimp ile model içe aktarma: 40+ formattan binary glTF'e (GLB).
 - [flutter_riglogic](tr/flutter_riglogic.md) - MetaHuman RigLogic: DNA dosyaları ve yüz rig'i hesaplama.
+- [flutter_kimodo](tr/flutter_kimodo.md) - kimodo.cpp: NVIDIA Kimodo ile metinden hareket üretimi, CPU ya da Vulkan.
 - [flutter_gstreamer](tr/flutter_gstreamer.md) - GStreamer binding'leri: in-process video encode ve medya probe.
 - [lumina_mouse_capture](tr/lumina_mouse_capture.md) - Linux'ta relative hareketli pointer capture (Wayland ve X11).
 - [lumina_smoke](tr/lumina_smoke.md) - Smoke test sistemi: artifact'ler, video kuralları, recorder'lar ve rapor çalıştırıcısı.
