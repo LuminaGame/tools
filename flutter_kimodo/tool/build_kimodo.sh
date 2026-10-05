@@ -16,7 +16,7 @@
 # headers (libvulkan-dev).
 set -euo pipefail
 
-vulkan=auto
+vulkan=on
 work=""
 clean=0
 while [ $# -gt 0 ]; do

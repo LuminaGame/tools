@@ -21,7 +21,7 @@
 # Needs: Visual Studio 2022 with the C++ workload (its bundled CMake 3.25+ and
 # Ninja are used when none is on PATH), git; for Vulkan the LunarG Vulkan SDK.
 param(
-  [ValidateSet('auto', 'on', 'off')] [string] $Vulkan = 'auto',
+  [ValidateSet('auto', 'on', 'off')] [string] $Vulkan = 'on',
   [string] $WorkDir = '',
   [switch] $Clean
 )
@@ -68,6 +68,13 @@ Log "cmake $cmakeVersion"
 
 # --- 2. Vulkan SDK ----------------------------------------------------------
 $glslc = $null
+if (-not $env:VULKAN_SDK) {
+  $sdkDir = Get-ChildItem -Path 'C:\VulkanSDK' -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+  if ($sdkDir) {
+    $env:VULKAN_SDK = $sdkDir.FullName
+    Log "Discovered Vulkan SDK: $env:VULKAN_SDK"
+  }
+}
 if ($env:VULKAN_SDK) {
   $candidate = Join-Path $env:VULKAN_SDK 'Bin\glslc.exe'
   if (Test-Path $candidate) { $glslc = $candidate }
