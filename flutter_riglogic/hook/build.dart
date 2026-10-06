@@ -79,8 +79,8 @@ void main(List<String> args) async {
           '-Wl,--whole-archive',
           '$riglogicLib/libriglogic.a',
           '-Wl,--no-whole-archive',
-          '$libcxx/usr/lib/x86_64-linux-gnu/libc++.a',
-          '$libcxx/usr/lib/x86_64-linux-gnu/libc++abi.a',
+          '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++.a',
+          '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++abi.a',
           '-ldl',
           '-lpthread',
         ] else if (targetOS == OS.macOS) ...[
@@ -160,3 +160,11 @@ String _libcxxDir(BuildInput input) {
 }
 
 String _dir(Uri uri) => riglogicDirPath(uri);
+
+/// The folder of the bundled libc++'s static libraries for the Linux target
+/// architecture: `x86_64-linux-gnu` or `aarch64-linux-gnu`.
+String _linuxTriplet(BuildInput input) => switch (input.config.code.targetArchitecture) {
+      Architecture.x64 => 'x86_64-linux-gnu',
+      Architecture.arm64 => 'aarch64-linux-gnu',
+      final other => throw UnsupportedError('Unsupported Linux architecture: $other'),
+    };

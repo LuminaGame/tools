@@ -76,8 +76,8 @@ void main(List<String> args) async {
           '$filament/out/cmake-release/third_party/libassimp/tnt/libassimp.a',
           '$filament/out/cmake-release/third_party/zstd/tnt/libzstd.a',
           '-Wl,--no-whole-archive',
-          '$libcxx/usr/lib/x86_64-linux-gnu/libc++.a',
-          '$libcxx/usr/lib/x86_64-linux-gnu/libc++abi.a',
+          '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++.a',
+          '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++abi.a',
           '-lz',
           '-ldl',
           '-lpthread',
@@ -142,3 +142,11 @@ String _dir(Uri uri) {
 /// drive letter; read it back as that Windows path.
 String _filePath(Uri uri) =>
     uri.scheme.length == 1 ? '${uri.scheme.toUpperCase()}:${uri.path}' : uri.toFilePath();
+
+/// The folder of the bundled libc++'s static libraries for the Linux target
+/// architecture: `x86_64-linux-gnu` or `aarch64-linux-gnu`.
+String _linuxTriplet(BuildInput input) => switch (input.config.code.targetArchitecture) {
+      Architecture.x64 => 'x86_64-linux-gnu',
+      Architecture.arm64 => 'aarch64-linux-gnu',
+      final other => throw UnsupportedError('Unsupported Linux architecture: $other'),
+    };
