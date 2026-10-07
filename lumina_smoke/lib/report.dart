@@ -14,15 +14,15 @@
 /// Plain Dart: it runs under `dart run`.
 library;
 
-export 'src/report/ansi.dart';
-export 'src/report/categories.dart';
-export 'src/report/config.dart';
-export 'src/report/dashboard_server.dart';
-export 'src/report/generator.dart';
-export 'src/report/html.dart';
-export 'src/report/model.dart';
-export 'src/report/paths.dart';
-export 'src/report/process_groups.dart';
-export 'src/report/run_mode.dart';
-export 'src/report/runner.dart';
-export 'src/video.dart';
+export 'package:lumina_smoke/src/report/ansi.dart';
+export 'package:lumina_smoke/src/report/categories.dart';
+export 'package:lumina_smoke/src/report/config.dart';
+export 'package:lumina_smoke/src/report/dashboard_server.dart';
+export 'package:lumina_smoke/src/report/generator.dart';
+export 'package:lumina_smoke/src/report/html.dart';
+export 'package:lumina_smoke/src/report/model.dart';
+export 'package:lumina_smoke/src/report/paths.dart';
+export 'package:lumina_smoke/src/report/process_groups.dart';
+export 'package:lumina_smoke/src/report/run_mode.dart';
+export 'package:lumina_smoke/src/report/runner.dart';
+export 'package:lumina_smoke/src/video.dart';

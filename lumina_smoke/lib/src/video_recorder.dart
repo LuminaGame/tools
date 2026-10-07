@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'temp_dirs.dart';
-import 'video.dart';
-import 'webm.dart';
+import 'package:lumina_smoke/src/temp_dirs.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/webm.dart';
 
 /// Records a smoke video frame by frame while the scenario runs, then encodes
 /// it with [SmokeWebm.vp8QualitySettings] at the frames' own resolution.

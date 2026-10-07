@@ -1,7 +1,7 @@
 import 'dart:ffi';
-import 'bindings.dart';
-import 'dna_reader.dart';
-import 'rig_instance.dart';
+import 'package:flutter_riglogic/src/bindings.dart';
+import 'package:flutter_riglogic/src/dna_reader.dart';
+import 'package:flutter_riglogic/src/rig_instance.dart';
 
 /// Evaluates MetaHuman facial rigs using machine-learned behavior,
 /// PSDs (Pose-Space Deformers), and RBFs.

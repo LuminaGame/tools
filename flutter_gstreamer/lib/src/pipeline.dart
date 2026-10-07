@@ -3,9 +3,9 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import 'bindings/gstreamer.g.dart' as raw;
-import 'exceptions.dart';
-import 'gstreamer.dart';
+import 'package:flutter_gstreamer/src/bindings/gstreamer.g.dart' as raw;
+import 'package:flutter_gstreamer/src/exceptions.dart';
+import 'package:flutter_gstreamer/src/gstreamer.dart';
 
 /// `GstState`.
 enum GstState {

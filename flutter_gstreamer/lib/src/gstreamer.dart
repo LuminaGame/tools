@@ -2,9 +2,9 @@ import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart';
 
-import 'bindings/gstreamer.g.dart';
-import 'exceptions.dart';
-import 'libraries.dart';
+import 'package:flutter_gstreamer/src/bindings/gstreamer.g.dart';
+import 'package:flutter_gstreamer/src/exceptions.dart';
+import 'package:flutter_gstreamer/src/libraries.dart';
 
 /// The GStreamer version the loaded library reports (`gst_version`).
 typedef GStreamerVersion = ({int major, int minor, int micro, int nano});

@@ -6,10 +6,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../artifacts.dart';
-import '../temp_dirs.dart';
-import '../video.dart';
-import '../video_recorder.dart';
+import 'package:lumina_smoke/src/artifacts.dart';
+import 'package:lumina_smoke/src/temp_dirs.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/video_recorder.dart';
 
 /// Records a smoke scenario as it runs: real frames of the app captured at a
 /// fixed rate while the test drives it. Every smoke video is at least 10 s of

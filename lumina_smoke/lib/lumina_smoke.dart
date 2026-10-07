@@ -15,10 +15,10 @@
 /// `package:lumina_smoke/report.dart`.
 library;
 
-export 'src/artifacts.dart';
-export 'src/png.dart';
-export 'src/temp_dirs.dart';
-export 'src/tools.dart';
-export 'src/video.dart';
-export 'src/video_recorder.dart';
-export 'src/webm.dart';
+export 'package:lumina_smoke/src/artifacts.dart';
+export 'package:lumina_smoke/src/png.dart';
+export 'package:lumina_smoke/src/temp_dirs.dart';
+export 'package:lumina_smoke/src/tools.dart';
+export 'package:lumina_smoke/src/video.dart';
+export 'package:lumina_smoke/src/video_recorder.dart';
+export 'package:lumina_smoke/src/webm.dart';

@@ -2,7 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 
-import 'third_party/assimp_c.g.dart' as native;
+import 'package:flutter_assimp/src/third_party/assimp_c.g.dart' as native;
 
 // Native function typedefs (dynamic-library fallback).
 typedef _StringFnNative = Pointer<Char> Function();

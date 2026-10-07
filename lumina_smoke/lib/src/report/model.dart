@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import '../video.dart';
+import 'package:lumina_smoke/src/video.dart';
 
 /// One PNG or video linked from the report (never embedded: the report is
 /// shared together with its `build/smoke_artifacts/` folder).

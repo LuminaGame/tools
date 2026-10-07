@@ -2,3 +2,8 @@ analyzer:
   exclude:
     - build/**
 include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Own-package files are imported by package URI, never by a relative path.
+    always_use_package_imports: true

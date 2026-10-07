@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Offset;
 
-import 'mouse_capture_backend.dart';
+import 'package:lumina_mouse_capture/src/mouse_capture_backend.dart';
 
 /// A backend that never touches the pointer: it records what was asked, and
 /// [emitMotion] / [emitLost] drive the same event path the native side does.

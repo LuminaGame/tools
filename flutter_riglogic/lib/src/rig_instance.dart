@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
-import 'bindings.dart';
-import 'rig_logic.dart';
+import 'package:flutter_riglogic/src/bindings.dart';
+import 'package:flutter_riglogic/src/rig_logic.dart';
 
 /// An instance of a rig driven by [RigLogic], containing runtime state, control inputs,
 /// and calculated joint transforms and blend shape outputs.

@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../artifacts.dart';
-import '../video.dart';
-import 'config.dart';
-import 'dashboard_server.dart';
-import 'generator.dart';
-import 'paths.dart';
-import 'process_groups.dart';
-import 'run_mode.dart';
+import 'package:lumina_smoke/src/artifacts.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/report/config.dart';
+import 'package:lumina_smoke/src/report/dashboard_server.dart';
+import 'package:lumina_smoke/src/report/generator.dart';
+import 'package:lumina_smoke/src/report/paths.dart';
+import 'package:lumina_smoke/src/report/process_groups.dart';
+import 'package:lumina_smoke/src/report/run_mode.dart';
 
 /// Where a report run reads and writes, from the environment:
 /// `LUMINA_SMOKE_OUT` (artifacts), `LUMINA_SMOKE_REPORT_OUT` (the index

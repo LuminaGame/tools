@@ -1,4 +1,4 @@
-import 'categories.dart';
+import 'package:lumina_smoke/src/report/categories.dart';
 
 /// A GPU backend the smoke targets run on, each run writing into its own
 /// `<artifacts>/<name>/` folder.

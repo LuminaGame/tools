@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_gstreamer/flutter_gstreamer.dart' show GStreamer, GStreamerException, MediaProbe;
 
-import 'tools.dart';
+import 'package:lumina_smoke/src/tools.dart';
 
 /// What [SmokeVideo] measured of one video file.
 class SmokeVideoInfo {

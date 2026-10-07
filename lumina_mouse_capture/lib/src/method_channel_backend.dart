@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import 'mouse_capture_backend.dart';
+import 'package:lumina_mouse_capture/src/mouse_capture_backend.dart';
 
 /// The native backend: `linux/lumina_mouse_capture_plugin.cc` and
 /// `windows/lumina_mouse_capture_plugin.cpp`.

@@ -3,3 +3,8 @@ analyzer:
   exclude:
     - filament/**
     - test-assets/**
+
+linter:
+  rules:
+    # Own-package files are imported by package URI, never by a relative path.
+    always_use_package_imports: true

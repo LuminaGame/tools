@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
-import 'bindings/flutter_kimodo_bindings.g.dart' as b;
-import 'kimodo_exception.dart';
+import 'package:flutter_kimodo/src/bindings/flutter_kimodo_bindings.g.dart' as b;
+import 'package:flutter_kimodo/src/kimodo_exception.dart';
 
 /// Where kimodo runs.
 enum KimodoDevice {

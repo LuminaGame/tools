@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../video.dart';
-import 'config.dart';
-import 'html.dart';
-import 'model.dart';
-import 'paths.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/report/config.dart';
+import 'package:lumina_smoke/src/report/html.dart';
+import 'package:lumina_smoke/src/report/model.dart';
+import 'package:lumina_smoke/src/report/paths.dart';
 
 /// Turns `flutter test --machine` events and the artifact directory into a
 /// [SmokeReportModel], and the model into HTML pages.

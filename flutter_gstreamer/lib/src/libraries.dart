@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
-import 'bindings/gstreamer.g.dart';
-import 'exceptions.dart';
+import 'package:flutter_gstreamer/src/bindings/gstreamer.g.dart';
+import 'package:flutter_gstreamer/src/exceptions.dart';
 
 /// The GStreamer shared libraries, opened at run time with
 /// [ffi.DynamicLibrary] (no link-time dependency on GStreamer).

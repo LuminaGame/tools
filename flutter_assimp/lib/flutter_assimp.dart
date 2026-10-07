@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'src/assimp_bindings.dart';
+import 'package:flutter_assimp/src/assimp_bindings.dart';
 
-export 'src/assimp_bindings.dart' show AssimpBindings, AssimpConvertOptions;
+export 'package:flutter_assimp/src/assimp_bindings.dart' show AssimpBindings, AssimpConvertOptions;
 
 /// Result of [FlutterAssimp.convertFileForImport]: the GLB and the bridge's
 /// report of what it did to get there.

@@ -5,10 +5,10 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import 'bindings/flutter_kimodo_bindings.g.dart' as b;
-import 'kimodo_exception.dart';
-import 'kimodo_motion.dart';
-import 'kimodo_runtime.dart';
+import 'package:flutter_kimodo/src/bindings/flutter_kimodo_bindings.g.dart' as b;
+import 'package:flutter_kimodo/src/kimodo_exception.dart';
+import 'package:flutter_kimodo/src/kimodo_motion.dart';
+import 'package:flutter_kimodo/src/kimodo_runtime.dart';
 
 /// How a motion is sampled.
 class KimodoGenerationOptions {

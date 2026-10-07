@@ -1,8 +1,8 @@
-import '../video.dart';
-import 'ansi.dart';
-import 'config.dart';
-import 'model.dart';
-import 'paths.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/report/ansi.dart';
+import 'package:lumina_smoke/src/report/config.dart';
+import 'package:lumina_smoke/src/report/model.dart';
+import 'package:lumina_smoke/src/report/paths.dart';
 
 /// The report's HTML: an index page and one page per category, every PNG and
 /// video linked relative to the page it is on, never embedded.

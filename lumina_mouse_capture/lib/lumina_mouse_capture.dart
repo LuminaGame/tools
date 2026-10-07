@@ -13,14 +13,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
 
-import 'src/environment_stub.dart' if (dart.library.io) 'src/environment_io.dart';
-import 'src/method_channel_backend.dart';
-import 'src/mouse_capture_backend.dart';
-import 'src/recording_backend.dart';
+import 'package:lumina_mouse_capture/src/environment_stub.dart' if (dart.library.io) 'src/environment_io.dart';
+import 'package:lumina_mouse_capture/src/method_channel_backend.dart';
+import 'package:lumina_mouse_capture/src/mouse_capture_backend.dart';
+import 'package:lumina_mouse_capture/src/recording_backend.dart';
 
-export 'src/method_channel_backend.dart';
-export 'src/mouse_capture_backend.dart';
-export 'src/recording_backend.dart';
+export 'package:lumina_mouse_capture/src/method_channel_backend.dart';
+export 'package:lumina_mouse_capture/src/mouse_capture_backend.dart';
+export 'package:lumina_mouse_capture/src/recording_backend.dart';
 
 /// Which backend [LuminaMouseCapture.chooseDefault] picked, and why.
 class MouseCaptureBackendChoice {

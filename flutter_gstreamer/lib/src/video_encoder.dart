@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'exceptions.dart';
-import 'gstreamer.dart';
-import 'pipeline.dart';
+import 'package:flutter_gstreamer/src/exceptions.dart';
+import 'package:flutter_gstreamer/src/gstreamer.dart';
+import 'package:flutter_gstreamer/src/pipeline.dart';
 
 /// What [VideoEncoder.addFrame] receives.
 enum VideoInput {

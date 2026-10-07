@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'png.dart';
-import 'tools.dart';
-import 'video.dart';
-import 'video_recorder.dart';
-import 'webm.dart';
+import 'package:lumina_smoke/src/png.dart';
+import 'package:lumina_smoke/src/tools.dart';
+import 'package:lumina_smoke/src/video.dart';
+import 'package:lumina_smoke/src/video_recorder.dart';
+import 'package:lumina_smoke/src/webm.dart';
 
 /// Publishes smoke-test evidence: PNG screenshots and VP8 / WebM videos, each
 /// with a sidecar JSON (`<sanitized name>.json`) that records the **declared

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../video.dart';
+import 'package:lumina_smoke/src/video.dart';
 
 /// Live interactive dashboard HTTP server for smoke test execution.
 ///

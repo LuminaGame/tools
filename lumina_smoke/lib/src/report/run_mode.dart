@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'config.dart';
-import 'paths.dart';
+import 'package:lumina_smoke/src/report/config.dart';
+import 'package:lumina_smoke/src/report/paths.dart';
 
 /// How a report run treats the report already in `build/`, and what it runs.
 ///

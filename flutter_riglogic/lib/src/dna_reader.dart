@@ -2,7 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
-import 'bindings.dart';
+import 'package:flutter_riglogic/src/bindings.dart';
 
 /// Reads MetaHuman DNA files containing joint hierarchy, blend shape mappings,
 /// and rig behavior parameters.

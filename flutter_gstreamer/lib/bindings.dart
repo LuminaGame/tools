@@ -6,4 +6,4 @@
 /// wrappers in `package:flutter_gstreamer/flutter_gstreamer.dart`.
 library;
 
-export 'src/bindings/gstreamer.g.dart';
+export 'package:flutter_gstreamer/src/bindings/gstreamer.g.dart';

@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter_gstreamer/flutter_gstreamer.dart'
     show FrameRate, GStreamer, GStreamerException, VideoEncoder, VideoInput, Vp8Quality;
 
-import 'tools.dart';
-import 'video.dart';
+import 'package:lumina_smoke/src/tools.dart';
+import 'package:lumina_smoke/src/video.dart';
 
 /// VP8 / WebM encoding of smoke frames: in-process with GStreamer
 /// (flutter_gstreamer, [Vp8Quality.smoke]) where it is installed, else with
