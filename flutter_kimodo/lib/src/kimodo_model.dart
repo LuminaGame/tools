@@ -126,16 +126,23 @@ class KimodoModel {
   Future<KimodoMotion> generate(
     String prompt, {
     required int frames,
+    Float32List? observedMotion,
+    Float32List? motionMask,
     KimodoGenerationOptions options = const KimodoGenerationOptions(),
   }) {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
     }
     RangeError.checkValueInInterval(frames, 1, maxFrames, 'frames');
+    if ((observedMotion != null) != (motionMask != null)) {
+      throw ArgumentError('observedMotion and motionMask must both be provided or both be null');
+    }
     return _request({
       'op': 'generate',
       'prompt': prompt,
       'frames': frames,
+      if (observedMotion != null) 'observedMotion': TransferableTypedData.fromList([observedMotion]),
+      if (motionMask != null) 'motionMask': TransferableTypedData.fromList([motionMask]),
       ..._options(options),
     });
   }
@@ -310,13 +317,34 @@ Map<String, Object> _generate(Pointer<b.kimodo_model> model, Map command) =>
         ..constraint_cfg_weight = command['constraintCfg'] as double;
       final Pointer<b.kimodo_motion> motion;
       if (command['op'] == 'generate') {
-        motion = b.flutter_kimodo_generate(
-          model,
-          (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
-          options,
-          err,
-          _errLen,
-        );
+        final observed = command['observedMotion'] as TransferableTypedData?;
+        final mask = command['motionMask'] as TransferableTypedData?;
+        if (observed != null && mask != null) {
+          final observedList = observed.materialize().asFloat32List();
+          final maskList = mask.materialize().asFloat32List();
+          final observedPtr = arena<Float>(observedList.length);
+          final maskPtr = arena<Float>(maskList.length);
+          observedPtr.asTypedList(observedList.length).setAll(0, observedList);
+          maskPtr.asTypedList(maskList.length).setAll(0, maskList);
+          motion = b.flutter_kimodo_generate_conditioned(
+            model,
+            (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
+            command['frames'] as int,
+            observedPtr,
+            maskPtr,
+            options,
+            err,
+            _errLen,
+          );
+        } else {
+          motion = b.flutter_kimodo_generate(
+            model,
+            (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
+            options,
+            err,
+            _errLen,
+          );
+        }
       } else {
         final prompts = (command['prompts'] as List).cast<String>();
         final frames = (command['frames'] as List).cast<int>();

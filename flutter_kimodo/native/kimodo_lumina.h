@@ -45,6 +45,20 @@ KIMODO_API kimodo_motion *kimodo_lumina_generate_sequence(
     char *err,
     int err_len);
 
+/*
+ * Generates one motion from a prompt, applying the provided SOMA constraint
+ * tensors. `observed_motion` and `motion_mask` must be [frames, 369] row-major.
+ */
+KIMODO_API kimodo_motion *kimodo_lumina_generate_conditioned(
+    kimodo_model *model,
+    const char *prompt,
+    uint32_t frames,
+    const float *observed_motion,
+    const float *motion_mask,
+    const kimodo_generation_options *options,
+    char *err,
+    int err_len);
+
 #ifdef __cplusplus
 }
 #endif

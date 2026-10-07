@@ -85,6 +85,13 @@ FFI_PLUGIN_EXPORT kimodo_motion *flutter_kimodo_generate(kimodo_model *model, co
                                                          const kimodo_generation_options *options,
                                                          char *err, int32_t err_len);
 
+/* kimodo_lumina_generate_conditioned: one prompt with conditioning tensors. Blocking. */
+FFI_PLUGIN_EXPORT kimodo_motion *flutter_kimodo_generate_conditioned(kimodo_model *model, const char *prompt,
+                                                                     uint32_t frames,
+                                                                     const float *observed_motion, const float *motion_mask,
+                                                                     const kimodo_generation_options *options,
+                                                                     char *err, int32_t err_len);
+
 /* kimodo_lumina_generate_sequence: prompts played in order. Blocking. */
 FFI_PLUGIN_EXPORT kimodo_motion *flutter_kimodo_generate_sequence(kimodo_model *model,
                                                                   const char *const *prompts,

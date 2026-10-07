@@ -95,4 +95,34 @@ kimodo_motion *kimodo_lumina_generate_sequence(
     catch (...) { return fail("unknown C++ exception"); }
 }
 
+kimodo_motion *kimodo_lumina_generate_conditioned(
+    kimodo_model *model, const char *prompt, uint32_t frames,
+    const float *observed_motion, const float *motion_mask,
+    const kimodo_generation_options *options, char *err, int err_len) {
+    auto fail = [&](const std::string &message) -> kimodo_motion * {
+        if (model) model->last_error = message;
+        write_error(err, err_len, message);
+        return nullptr;
+    };
+    try {
+        if (!model || !model->value) return fail("invalid model");
+        if (!options || options->size != sizeof(*options)) return fail("invalid kimodo_generation_options");
+        if (!prompt) return fail("prompt is NULL");
+        if (!observed_motion || !motion_mask) return fail("observed_motion and motion_mask are required");
+        
+        std::span<const float> obs(observed_motion, static_cast<size_t>(frames) * 369);
+        std::span<const float> mask(motion_mask, static_cast<size_t>(frames) * 369);
+
+        auto generated = model->value->generate_text(
+            prompt, frames, options->diffusion_steps, options->seed,
+            options->text_cfg_weight, options->constraint_cfg_weight,
+            obs, mask);
+        
+        if (!generated) return fail(generated.error());
+        model->last_error.clear();
+        return new kimodo_motion{std::move(*generated)};
+    } catch (const std::exception &e) { return fail(e.what()); }
+    catch (...) { return fail("unknown C++ exception"); }
+}
+
 } // extern "C"
