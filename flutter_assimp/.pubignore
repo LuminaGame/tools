@@ -1,0 +1,19 @@
+# pub reads this file instead of .gitignore in this folder; keep the two in
+# sync. Everything the native-assets hook compiles (src/, third_party/) ships.
+.dart_tool/
+build/
+**/build/
+pubspec.lock
+pubspec_overrides.yaml
+.flutter-plugins-dependencies
+
+# Native build outputs
+*.so
+*.o
+*.a
+*.dylib
+*.dll
+*.lib
+*.obj
+*.pdb
+*.exp

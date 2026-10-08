@@ -8,21 +8,54 @@ import 'package:flutter_assimp/src/third_party/assimp_c.g.dart' as native;
 typedef _StringFnNative = Pointer<Char> Function();
 typedef _StringFnDart = Pointer<Char> Function();
 
-typedef _ConvertFileNative = Int32 Function(Pointer<Char>, Pointer<Char>, Uint32);
+typedef _ConvertFileNative =
+    Int32 Function(Pointer<Char>, Pointer<Char>, Uint32);
 typedef _ConvertFileDart = int Function(Pointer<Char>, Pointer<Char>, int);
 
-typedef _ConvertFileExNative = Int32 Function(Pointer<Char>, Pointer<Char>, Uint32, Uint32);
-typedef _ConvertFileExDart = int Function(Pointer<Char>, Pointer<Char>, int, int);
+typedef _ConvertFileExNative =
+    Int32 Function(Pointer<Char>, Pointer<Char>, Uint32, Uint32);
+typedef _ConvertFileExDart =
+    int Function(Pointer<Char>, Pointer<Char>, int, int);
 
-typedef _ConvertMemoryNative = Int32 Function(
-    Pointer<Uint8>, Size, Pointer<Char>, Pointer<Pointer<Uint8>>, Pointer<Size>, Uint32);
-typedef _ConvertMemoryDart = int Function(
-    Pointer<Uint8>, int, Pointer<Char>, Pointer<Pointer<Uint8>>, Pointer<Size>, int);
+typedef _ConvertMemoryNative =
+    Int32 Function(
+      Pointer<Uint8>,
+      Size,
+      Pointer<Char>,
+      Pointer<Pointer<Uint8>>,
+      Pointer<Size>,
+      Uint32,
+    );
+typedef _ConvertMemoryDart =
+    int Function(
+      Pointer<Uint8>,
+      int,
+      Pointer<Char>,
+      Pointer<Pointer<Uint8>>,
+      Pointer<Size>,
+      int,
+    );
 
-typedef _ConvertMemoryExNative = Int32 Function(
-    Pointer<Uint8>, Size, Pointer<Char>, Pointer<Pointer<Uint8>>, Pointer<Size>, Uint32, Uint32);
-typedef _ConvertMemoryExDart = int Function(
-    Pointer<Uint8>, int, Pointer<Char>, Pointer<Pointer<Uint8>>, Pointer<Size>, int, int);
+typedef _ConvertMemoryExNative =
+    Int32 Function(
+      Pointer<Uint8>,
+      Size,
+      Pointer<Char>,
+      Pointer<Pointer<Uint8>>,
+      Pointer<Size>,
+      Uint32,
+      Uint32,
+    );
+typedef _ConvertMemoryExDart =
+    int Function(
+      Pointer<Uint8>,
+      int,
+      Pointer<Char>,
+      Pointer<Pointer<Uint8>>,
+      Pointer<Size>,
+      int,
+      int,
+    );
 
 typedef _FreeBlobNative = Void Function(Pointer<Uint8>);
 typedef _FreeBlobDart = void Function(Pointer<Uint8>);
@@ -89,10 +122,12 @@ class AssimpBindings {
     _getLastReport = () => native.assimp_get_last_report();
     _getImportExtensions = () => native.assimp_get_import_extensions();
     _convertFileToGlb = (a, b, f) => native.assimp_convert_file_to_glb(a, b, f);
-    _convertFileToGlbEx = (a, b, f, o) => native.assimp_convert_file_to_glb_ex(a, b, f, o);
-    _convertMemoryToGlb = (a, n, h, ob, ol, f) => native.assimp_convert_memory_to_glb(a, n, h, ob, ol, f);
-    _convertMemoryToGlbEx =
-        (a, n, h, ob, ol, f, o) => native.assimp_convert_memory_to_glb_ex(a, n, h, ob, ol, f, o);
+    _convertFileToGlbEx = (a, b, f, o) =>
+        native.assimp_convert_file_to_glb_ex(a, b, f, o);
+    _convertMemoryToGlb = (a, n, h, ob, ol, f) =>
+        native.assimp_convert_memory_to_glb(a, n, h, ob, ol, f);
+    _convertMemoryToGlbEx = (a, n, h, ob, ol, f, o) =>
+        native.assimp_convert_memory_to_glb_ex(a, n, h, ob, ol, f, o);
     _freeBlob = (p) => native.assimp_free_blob(p);
     _isAvailable = true;
     _hasEx = true;
@@ -103,26 +138,46 @@ class AssimpBindings {
   void _bindDynamicLibrary() {
     try {
       final (dylib, path) = _loadDynamicLibrary();
-      _getVersion = dylib.lookupFunction<_StringFnNative, _StringFnDart>('assimp_get_version');
-      _getLastError = dylib.lookupFunction<_StringFnNative, _StringFnDart>('assimp_get_last_error');
-      _convertFileToGlb = dylib.lookupFunction<_ConvertFileNative, _ConvertFileDart>('assimp_convert_file_to_glb');
-      _convertMemoryToGlb =
-          dylib.lookupFunction<_ConvertMemoryNative, _ConvertMemoryDart>('assimp_convert_memory_to_glb');
-      _freeBlob = dylib.lookupFunction<_FreeBlobNative, _FreeBlobDart>('assimp_free_blob');
+      _getVersion = dylib.lookupFunction<_StringFnNative, _StringFnDart>(
+        'assimp_get_version',
+      );
+      _getLastError = dylib.lookupFunction<_StringFnNative, _StringFnDart>(
+        'assimp_get_last_error',
+      );
+      _convertFileToGlb = dylib
+          .lookupFunction<_ConvertFileNative, _ConvertFileDart>(
+            'assimp_convert_file_to_glb',
+          );
+      _convertMemoryToGlb = dylib
+          .lookupFunction<_ConvertMemoryNative, _ConvertMemoryDart>(
+            'assimp_convert_memory_to_glb',
+          );
+      _freeBlob = dylib.lookupFunction<_FreeBlobNative, _FreeBlobDart>(
+        'assimp_free_blob',
+      );
       _isAvailable = true;
       _source = path;
       try {
-        _getLastReport = dylib.lookupFunction<_StringFnNative, _StringFnDart>('assimp_get_last_report');
-        _convertFileToGlbEx =
-            dylib.lookupFunction<_ConvertFileExNative, _ConvertFileExDart>('assimp_convert_file_to_glb_ex');
-        _convertMemoryToGlbEx =
-            dylib.lookupFunction<_ConvertMemoryExNative, _ConvertMemoryExDart>('assimp_convert_memory_to_glb_ex');
+        _getLastReport = dylib.lookupFunction<_StringFnNative, _StringFnDart>(
+          'assimp_get_last_report',
+        );
+        _convertFileToGlbEx = dylib
+            .lookupFunction<_ConvertFileExNative, _ConvertFileExDart>(
+              'assimp_convert_file_to_glb_ex',
+            );
+        _convertMemoryToGlbEx = dylib
+            .lookupFunction<_ConvertMemoryExNative, _ConvertMemoryExDart>(
+              'assimp_convert_memory_to_glb_ex',
+            );
         _hasEx = true;
       } catch (_) {
         _hasEx = false;
       }
       try {
-        _getImportExtensions = dylib.lookupFunction<_StringFnNative, _StringFnDart>('assimp_get_import_extensions');
+        _getImportExtensions = dylib
+            .lookupFunction<_StringFnNative, _StringFnDart>(
+              'assimp_get_import_extensions',
+            );
       } catch (_) {}
     } catch (e) {
       _isAvailable = false;
@@ -187,7 +242,12 @@ class AssimpBindings {
     return _getLastReport().cast<Utf8>().toDartString();
   }
 
-  bool convertFileToGlb(String inPath, String outPath, {int flags = 0, int options = 0}) {
+  bool convertFileToGlb(
+    String inPath,
+    String outPath, {
+    int flags = 0,
+    int options = 0,
+  }) {
     if (!_isAvailable) return false;
     if (options != 0 && !_hasEx) return false;
     final inPtr = inPath.toNativeUtf8().cast<Char>();
@@ -203,7 +263,12 @@ class AssimpBindings {
     }
   }
 
-  List<int>? convertMemoryToGlb(List<int> inBytes, {String hint = 'fbx', int flags = 0, int options = 0}) {
+  List<int>? convertMemoryToGlb(
+    List<int> inBytes, {
+    String hint = 'fbx',
+    int flags = 0,
+    int options = 0,
+  }) {
     if (!_isAvailable || inBytes.isEmpty) return null;
     if (options != 0 && !_hasEx) return null;
 
@@ -217,8 +282,23 @@ class AssimpBindings {
 
     try {
       final result = options == 0
-          ? _convertMemoryToGlb(inPtr, inLen, hintPtr, outBytesPtrPtr, outLenPtr, flags)
-          : _convertMemoryToGlbEx(inPtr, inLen, hintPtr, outBytesPtrPtr, outLenPtr, flags, options);
+          ? _convertMemoryToGlb(
+              inPtr,
+              inLen,
+              hintPtr,
+              outBytesPtrPtr,
+              outLenPtr,
+              flags,
+            )
+          : _convertMemoryToGlbEx(
+              inPtr,
+              inLen,
+              hintPtr,
+              outBytesPtrPtr,
+              outLenPtr,
+              flags,
+              options,
+            );
       if (result != 1) return null;
 
       final outLen = outLenPtr.value;

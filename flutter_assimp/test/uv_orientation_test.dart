@@ -29,11 +29,17 @@ void main() {
 
   File write(String name, Object content) {
     final file = File('${dir.path}/$name');
-    content is String ? file.writeAsStringSync(content) : file.writeAsBytesSync(content as List<int>);
+    content is String
+        ? file.writeAsStringSync(content)
+        : file.writeAsBytesSync(content as List<int>);
     return file;
   }
 
-  void expectGltfUvs(Uint8List? glb, {int set = 0, Map<String, List<double>>? expected}) {
+  void expectGltfUvs(
+    Uint8List? glb, {
+    int set = 0,
+    Map<String, List<double>>? expected,
+  }) {
     expect(glb, isNotNull, reason: FlutterAssimp.lastError);
     final uvs = texcoordsByPosition(glb!, set: set);
     final want = expected ?? reference;
@@ -44,13 +50,18 @@ void main() {
     }
   }
 
-  test('the hand-built reference glTF puts V = 1 at the bottom-left corner', () {
-    expect(reference['0,0,0'], [0.0, 1.0]);
-    expect(reference['0,1,0'], [0.0, 0.0]);
-  });
+  test(
+    'the hand-built reference glTF puts V = 1 at the bottom-left corner',
+    () {
+      expect(reference['0,0,0'], [0.0, 1.0]);
+      expect(reference['0,1,0'], [0.0, 0.0]);
+    },
+  );
 
   test('an OBJ quad converts from its file with glTF UVs', () {
-    if (!FlutterAssimp.isAvailable) return markTestSkipped('Assimp bridge not loaded');
+    if (!FlutterAssimp.isAvailable) {
+      return markTestSkipped('Assimp bridge not loaded');
+    }
     final obj = write('quad.obj', objQuad);
     for (final options in [0, AssimpConvertOptions.all]) {
       final c = FlutterAssimp.convertFileForImport(obj.path, options: options);
@@ -60,12 +71,21 @@ void main() {
   });
 
   test('an OBJ quad converts from memory with glTF UVs', () async {
-    if (!FlutterAssimp.isAvailable) return markTestSkipped('Assimp bridge not loaded');
-    expectGltfUvs(await FlutterAssimp.convertMemoryToGlb(Uint8List.fromList(utf8.encode(objQuad)), hint: 'obj'));
+    if (!FlutterAssimp.isAvailable) {
+      return markTestSkipped('Assimp bridge not loaded');
+    }
+    expectGltfUvs(
+      await FlutterAssimp.convertMemoryToGlb(
+        Uint8List.fromList(utf8.encode(objQuad)),
+        hint: 'obj',
+      ),
+    );
   });
 
   test('an OBJ quad converts file to file with glTF UVs', () async {
-    if (!FlutterAssimp.isAvailable) return markTestSkipped('Assimp bridge not loaded');
+    if (!FlutterAssimp.isAvailable) {
+      return markTestSkipped('Assimp bridge not loaded');
+    }
     final obj = write('quad.obj', objQuad);
     final out = File('${dir.path}/quad.glb');
     expect(await FlutterAssimp.convertFileToGlb(obj.path, out.path), isTrue);
@@ -73,22 +93,36 @@ void main() {
   });
 
   test('an FBX quad converts with glTF UVs on both UV sets', () async {
-    if (!FlutterAssimp.isAvailable) return markTestSkipped('Assimp bridge not loaded');
+    if (!FlutterAssimp.isAvailable) {
+      return markTestSkipped('Assimp bridge not loaded');
+    }
     final fbx = write('quad.fbx', fbxQuad);
     // The second UV set (a lightmap layout) is the first one scaled by half.
-    final lightmap = {for (final e in reference.entries) e.key: [e.value[0] / 2, 1 - (1 - e.value[1]) / 2]};
+    final lightmap = {
+      for (final e in reference.entries)
+        e.key: [e.value[0] / 2, 1 - (1 - e.value[1]) / 2],
+    };
     for (final options in [0, AssimpConvertOptions.all]) {
       final c = FlutterAssimp.convertFileForImport(fbx.path, options: options);
       expect(c.error, isNull);
       expectGltfUvs(c.glb);
       expectGltfUvs(c.glb, set: 1, expected: lightmap);
     }
-    expectGltfUvs(await FlutterAssimp.convertMemoryToGlb(Uint8List.fromList(utf8.encode(fbxQuad)), hint: 'fbx'));
+    expectGltfUvs(
+      await FlutterAssimp.convertMemoryToGlb(
+        Uint8List.fromList(utf8.encode(fbxQuad)),
+        hint: 'fbx',
+      ),
+    );
   });
 
   test('a Collada quad converts with glTF UVs', () {
-    if (!FlutterAssimp.isAvailable) return markTestSkipped('Assimp bridge not loaded');
-    if (!FlutterAssimp.importExtensions.contains('dae')) return markTestSkipped('bridge built without Collada');
+    if (!FlutterAssimp.isAvailable) {
+      return markTestSkipped('Assimp bridge not loaded');
+    }
+    if (!FlutterAssimp.importExtensions.contains('dae')) {
+      return markTestSkipped('bridge built without Collada');
+    }
     final dae = write('quad.dae', colladaQuad('crate.png'));
     final c = FlutterAssimp.convertFileForImport(dae.path, options: 0);
     expect(c.error, isNull);
@@ -96,7 +130,8 @@ void main() {
   });
 }
 
-const objQuad = 'v -1 0 0\nv 1 0 0\nv 1 2 0\nv -1 2 0\n'
+const objQuad =
+    'v -1 0 0\nv 1 0 0\nv 1 2 0\nv -1 2 0\n'
     'vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n'
     'f 1/1 2/2 3/3\nf 1/1 3/3 4/4\n';
 
@@ -226,7 +261,9 @@ Uint8List handBuiltGlb(List<(List<double>, List<double>)> corners) {
   final n = corners.length;
   final json = {
     'asset': {'version': '2.0'},
-    'buffers': [{'byteLength': bin.lengthInBytes}],
+    'buffers': [
+      {'byteLength': bin.lengthInBytes},
+    ],
     'bufferViews': [
       {'buffer': 0, 'byteOffset': 0, 'byteLength': n * 12},
       {'buffer': 0, 'byteOffset': n * 12, 'byteLength': n * 8},
@@ -240,15 +277,27 @@ Uint8List handBuiltGlb(List<(List<double>, List<double>)> corners) {
     'meshes': [
       {
         'primitives': [
-          {'attributes': {'POSITION': 0, 'TEXCOORD_0': 1}, 'indices': 2},
+          {
+            'attributes': {'POSITION': 0, 'TEXCOORD_0': 1},
+            'indices': 2,
+          },
         ],
       },
     ],
-    'nodes': [{'mesh': 0}],
-    'scenes': [{'nodes': [0]}],
+    'nodes': [
+      {'mesh': 0},
+    ],
+    'scenes': [
+      {
+        'nodes': [0],
+      },
+    ],
   };
   var jsonBytes = utf8.encode(jsonEncode(json));
-  jsonBytes = Uint8List.fromList([...jsonBytes, ...List.filled((4 - jsonBytes.length % 4) % 4, 0x20)]);
+  jsonBytes = Uint8List.fromList([
+    ...jsonBytes,
+    ...List.filled((4 - jsonBytes.length % 4) % 4, 0x20),
+  ]);
   final total = 12 + 8 + jsonBytes.length + 8 + bin.lengthInBytes;
   final head = ByteData(12)
     ..setUint32(0, 0x46546C67, Endian.little)
@@ -271,7 +320,9 @@ Uint8List handBuiltGlb(List<(List<double>, List<double>)> corners) {
 Map<String, List<double>> texcoordsByPosition(Uint8List glb, {int set = 0}) {
   final data = ByteData.sublistView(glb);
   final jsonLength = data.getUint32(12, Endian.little);
-  final json = jsonDecode(utf8.decode(glb.sublist(20, 20 + jsonLength))) as Map<String, dynamic>;
+  final json =
+      jsonDecode(utf8.decode(glb.sublist(20, 20 + jsonLength)))
+          as Map<String, dynamic>;
   final binStart = 20 + jsonLength + 8;
 
   List<List<double>> read(int accessorIndex) {
@@ -279,10 +330,16 @@ Map<String, List<double>> texcoordsByPosition(Uint8List glb, {int set = 0}) {
     final view = (json['bufferViews'] as List)[acc['bufferView'] as int] as Map;
     final width = acc['type'] == 'VEC3' ? 3 : 2;
     final stride = (view['byteStride'] as int?) ?? width * 4;
-    final start = binStart + ((view['byteOffset'] as int?) ?? 0) + ((acc['byteOffset'] as int?) ?? 0);
+    final start =
+        binStart +
+        ((view['byteOffset'] as int?) ?? 0) +
+        ((acc['byteOffset'] as int?) ?? 0);
     return [
       for (var i = 0; i < (acc['count'] as int); i++)
-        [for (var c = 0; c < width; c++) data.getFloat32(start + i * stride + c * 4, Endian.little)],
+        [
+          for (var c = 0; c < width; c++)
+            data.getFloat32(start + i * stride + c * 4, Endian.little),
+        ],
     ];
   }
 
@@ -294,11 +351,20 @@ Map<String, List<double>> texcoordsByPosition(Uint8List glb, {int set = 0}) {
       final uvs = read(attributes['TEXCOORD_$set'] as int);
       // Keyed by the corner within the bounding box, so a unit scale baked
       // into the vertices does not change the key.
-      final lo = [for (var c = 0; c < 3; c++) positions.map((q) => q[c]).reduce((a, b) => a < b ? a : b)];
-      final hi = [for (var c = 0; c < 3; c++) positions.map((q) => q[c]).reduce((a, b) => a > b ? a : b)];
+      final lo = [
+        for (var c = 0; c < 3; c++)
+          positions.map((q) => q[c]).reduce((a, b) => a < b ? a : b),
+      ];
+      final hi = [
+        for (var c = 0; c < 3; c++)
+          positions.map((q) => q[c]).reduce((a, b) => a > b ? a : b),
+      ];
       for (var i = 0; i < positions.length; i++) {
         final key = [
-          for (var c = 0; c < 3; c++) hi[c] - lo[c] < 1e-9 ? 0 : ((positions[i][c] - lo[c]) / (hi[c] - lo[c])).round(),
+          for (var c = 0; c < 3; c++)
+            hi[c] - lo[c] < 1e-9
+                ? 0
+                : ((positions[i][c] - lo[c]) / (hi[c] - lo[c])).round(),
         ].join(',');
         out[key] = uvs[i];
       }

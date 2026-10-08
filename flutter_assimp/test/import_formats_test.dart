@@ -14,7 +14,8 @@ void main() {
 
   Map<String, dynamic> gltf(Uint8List glb) {
     final length = ByteData.sublistView(glb).getUint32(12, Endian.little);
-    return jsonDecode(utf8.decode(glb.sublist(20, 20 + length))) as Map<String, dynamic>;
+    return jsonDecode(utf8.decode(glb.sublist(20, 20 + length)))
+        as Map<String, dynamic>;
   }
 
   int triangles(Map<String, dynamic> json) {
@@ -22,16 +23,19 @@ void main() {
     for (final mesh in (json['meshes'] as List? ?? const [])) {
       for (final p in (mesh as Map)['primitives'] as List) {
         final indices = (p as Map)['indices'] as int?;
-        n += indices == null ? 0 : ((json['accessors'] as List)[indices] as Map)['count'] as int;
+        n += indices == null
+            ? 0
+            : ((json['accessors'] as List)[indices] as Map)['count'] as int;
       }
     }
     return n ~/ 3;
   }
 
   List<String> texturePaths(Map<String, dynamic> report) => [
-        for (final m in (report['material_details'] as List? ?? const []))
-          for (final t in ((m as Map)['textures'] as List? ?? const [])) '${(t as Map)['path']}',
-      ];
+    for (final m in (report['material_details'] as List? ?? const []))
+      for (final t in ((m as Map)['textures'] as List? ?? const []))
+        '${(t as Map)['path']}',
+  ];
 
   for (final (ext, texture) in [
     ('dae', 'Maps/crate.png'),
@@ -53,7 +57,10 @@ void main() {
         file.writeAsBytesSync(content as List<int>);
       }
 
-      final c = FlutterAssimp.convertFileForImport(file.path, options: AssimpConvertOptions.normalize);
+      final c = FlutterAssimp.convertFileForImport(
+        file.path,
+        options: AssimpConvertOptions.normalize,
+      );
 
       expect(c.error, isNull);
       final json = gltf(c.glb!);
@@ -63,14 +70,26 @@ void main() {
   }
 
   test('the supported formats are the ones the bridge reads', () {
-    for (final f in ['m.fbx', 'm.OBJ', 'm.dae', 'm.3ds', 'm.ply', 'm.x', 'm.stl', '.dae']) {
+    for (final f in [
+      'm.fbx',
+      'm.OBJ',
+      'm.dae',
+      'm.3ds',
+      'm.ply',
+      'm.x',
+      'm.stl',
+      '.dae',
+    ]) {
       expect(FlutterAssimp.isSupportedFormat(f), isTrue, reason: f);
     }
     for (final f in ['m.blend', 'm.lwo', 'm.md2', 'm.txt', 'm.glb']) {
       expect(FlutterAssimp.isSupportedFormat(f), isFalse, reason: f);
     }
     if (FlutterAssimp.isAvailable) {
-      expect(FlutterAssimp.importExtensions, containsAll(['fbx', 'obj', 'dae', '3ds', 'ply', 'x', 'stl']));
+      expect(
+        FlutterAssimp.importExtensions,
+        containsAll(['fbx', 'obj', 'dae', '3ds', 'ply', 'x', 'stl']),
+      );
     }
   });
 }
@@ -78,28 +97,32 @@ void main() {
 /// A 2 × 2 quad (two triangles, UVs, one material "Crate" sampling [texture])
 /// written as a real file of format [ext].
 Object quadIn(String ext, String? texture) => switch (ext) {
-      'dae' => colladaQuad(texture!),
-      '3ds' => threeDsQuad(texture!),
-      'ply' => 'ply\nformat ascii 1.0\ncomment TextureFile $texture\n'
-          'element vertex 4\nproperty float x\nproperty float y\nproperty float z\nproperty float s\nproperty float t\n'
-          'element face 2\nproperty list uchar int vertex_indices\nend_header\n'
-          '-1 0 0 0 0\n1 0 0 1 0\n1 2 0 1 1\n-1 2 0 0 1\n3 0 1 2\n3 0 2 3\n',
-      'x' => 'xof 0303txt 0032\n'
-          'Frame Quad {\n FrameTransformMatrix { 1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0;; }\n'
-          ' Mesh {\n  4;\n  -1.0;0.0;0.0;, 1.0;0.0;0.0;, 1.0;2.0;0.0;, -1.0;2.0;0.0;;\n'
-          '  2;\n  3;0,2,1;, 3;0,3,2;;\n'
-          '  MeshTextureCoords { 4; 0.0;1.0;, 1.0;1.0;, 1.0;0.0;, 0.0;0.0;; }\n'
-          '  MeshMaterialList { 1; 2; 0, 0;;\n'
-          '   Material Crate { 1.0;1.0;1.0;1.0;; 0.0; 0.0;0.0;0.0;; 0.0;0.0;0.0;; TextureFilename { "$texture"; } }\n'
-          '  }\n }\n}\n',
-      'stl' => 'solid quad\n'
-          'facet normal 0 0 1\nouter loop\nvertex -1 0 0\nvertex 1 0 0\nvertex 1 2 0\nendloop\nendfacet\n'
-          'facet normal 0 0 1\nouter loop\nvertex -1 0 0\nvertex 1 2 0\nvertex -1 2 0\nendloop\nendfacet\n'
-          'endsolid quad\n',
-      _ => throw ArgumentError(ext),
-    };
+  'dae' => colladaQuad(texture!),
+  '3ds' => threeDsQuad(texture!),
+  'ply' =>
+    'ply\nformat ascii 1.0\ncomment TextureFile $texture\n'
+        'element vertex 4\nproperty float x\nproperty float y\nproperty float z\nproperty float s\nproperty float t\n'
+        'element face 2\nproperty list uchar int vertex_indices\nend_header\n'
+        '-1 0 0 0 0\n1 0 0 1 0\n1 2 0 1 1\n-1 2 0 0 1\n3 0 1 2\n3 0 2 3\n',
+  'x' =>
+    'xof 0303txt 0032\n'
+        'Frame Quad {\n FrameTransformMatrix { 1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0;; }\n'
+        ' Mesh {\n  4;\n  -1.0;0.0;0.0;, 1.0;0.0;0.0;, 1.0;2.0;0.0;, -1.0;2.0;0.0;;\n'
+        '  2;\n  3;0,2,1;, 3;0,3,2;;\n'
+        '  MeshTextureCoords { 4; 0.0;1.0;, 1.0;1.0;, 1.0;0.0;, 0.0;0.0;; }\n'
+        '  MeshMaterialList { 1; 2; 0, 0;;\n'
+        '   Material Crate { 1.0;1.0;1.0;1.0;; 0.0; 0.0;0.0;0.0;; 0.0;0.0;0.0;; TextureFilename { "$texture"; } }\n'
+        '  }\n }\n}\n',
+  'stl' =>
+    'solid quad\n'
+        'facet normal 0 0 1\nouter loop\nvertex -1 0 0\nvertex 1 0 0\nvertex 1 2 0\nendloop\nendfacet\n'
+        'facet normal 0 0 1\nouter loop\nvertex -1 0 0\nvertex 1 2 0\nvertex -1 2 0\nendloop\nendfacet\n'
+        'endsolid quad\n',
+  _ => throw ArgumentError(ext),
+};
 
-String colladaQuad(String texture) => '''<?xml version="1.0" encoding="utf-8"?>
+String colladaQuad(String texture) =>
+    '''<?xml version="1.0" encoding="utf-8"?>
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
   <asset><unit name="meter" meter="1"/><up_axis>Y_UP</up_axis></asset>
   <library_images><image id="crate_png" name="crate_png"><init_from>$texture</init_from></image></library_images>
@@ -135,7 +158,10 @@ Uint8List threeDsQuad(String texture) {
     final head = ByteData(6)
       ..setUint16(0, id, Endian.little)
       ..setUint32(2, length, Endian.little);
-    return Uint8List.fromList([...head.buffer.asUint8List(), for (final b in body) ...b]);
+    return Uint8List.fromList([
+      ...head.buffer.asUint8List(),
+      for (final b in body) ...b,
+    ]);
   }
 
   Uint8List cstr(String s) => Uint8List.fromList([...latin1.encode(s), 0]);
@@ -147,7 +173,8 @@ Uint8List threeDsQuad(String texture) {
     return d.buffer.asUint8List();
   }
 
-  Uint8List u32(int v) => (ByteData(4)..setUint32(0, v, Endian.little)).buffer.asUint8List();
+  Uint8List u32(int v) =>
+      (ByteData(4)..setUint32(0, v, Endian.little)).buffer.asUint8List();
   Uint8List f32(List<double> v) {
     final d = ByteData(v.length * 4);
     for (var i = 0; i < v.length; i++) {
@@ -158,20 +185,37 @@ Uint8List threeDsQuad(String texture) {
 
   final material = chunk(0xAFFF, [
     chunk(0xA000, [cstr('Crate')]),
-    chunk(0xA020, [chunk(0x0011, [Uint8List.fromList([255, 255, 255])])]),
+    chunk(0xA020, [
+      chunk(0x0011, [
+        Uint8List.fromList([255, 255, 255]),
+      ]),
+    ]),
     chunk(0xA200, [
-      chunk(0x0030, [u16([100])]),
+      chunk(0x0030, [
+        u16([100]),
+      ]),
       chunk(0xA300, [cstr(texture)]),
     ]),
   ]);
   final mesh = chunk(0x4100, [
-    chunk(0x4110, [u16([4]), f32([-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2])]),
-    chunk(0x4140, [u16([4]), f32([0, 0, 1, 0, 1, 1, 0, 1])]),
+    chunk(0x4110, [
+      u16([4]),
+      f32([-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2]),
+    ]),
+    chunk(0x4140, [
+      u16([4]),
+      f32([0, 0, 1, 0, 1, 1, 0, 1]),
+    ]),
     chunk(0x4120, [
       u16([2, 0, 1, 2, 0, 0, 2, 3, 0]),
-      chunk(0x4130, [cstr('Crate'), u16([2, 0, 1])]),
+      chunk(0x4130, [
+        cstr('Crate'),
+        u16([2, 0, 1]),
+      ]),
     ]),
-    chunk(0x4160, [f32([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])]),
+    chunk(0x4160, [
+      f32([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+    ]),
   ]);
   return chunk(0x4D4D, [
     chunk(0x0002, [u32(3)]),
