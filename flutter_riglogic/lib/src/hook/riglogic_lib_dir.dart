@@ -23,8 +23,9 @@ String resolveRiglogicLibDir({
   String? androidAbi,
   bool Function(String path)? exists,
 }) {
-  if (environment != null && environment.isNotEmpty)
+  if (environment != null && environment.isNotEmpty) {
     return riglogicDirPath(Uri.directory(environment));
+  }
   final found = exists ?? (path) => File(path).existsSync();
   final defaultDir = riglogicDirPath(packageDefault);
   final libSubpath = androidAbi != null
@@ -34,8 +35,9 @@ String resolveRiglogicLibDir({
     final defined = riglogicDirPath(userDefine);
     if (found('$defined/$libSubpath') ||
         found('$defined/$staticLib') ||
-        !found('$defaultDir/$libSubpath'))
+        !found('$defaultDir/$libSubpath')) {
       return defined;
+    }
   }
   return defaultDir;
 }

@@ -156,83 +156,21 @@ Future<void> _buildVendored(
   // Linux only: the bundled libc++ of a Lumina checkout, when there is one.
   final libcxx = targetOS == OS.linux ? _bundledLibcxx(input) : null;
 
-  final includes = [
-    'src',
-    'third_party/assimp',
-    'third_party/assimp/code',
-    'third_party/assimp/include',
-    'third_party/assimp/contrib/irrXML',
-    'third_party/assimp/contrib/rapidjson/include',
-    'third_party/assimp/contrib/unzip',
-    if (windows) 'third_party/zlib',
-  ];
-  // Every importer but the seven the bridge reads; Assimp's importer registry
-  // then registers exactly those (FBX, OBJ, Collada, 3DS, PLY, DirectX, STL),
-  // so FLUTTER_ASSIMP_EXTRA_IMPORTERS stays undefined.
-  Map<String, String?> defines({required bool gltfHeaders}) => {
-    for (final importer in _disabledImporters)
-      if (gltfHeaders ? !importer.startsWith('GLTF') : true)
-        'ASSIMP_BUILD_NO_${importer}_IMPORTER': null,
-    'ASSIMP_BUILD_NO_OWN_ZLIB': null,
-  };
-  final cxxFlags = [
-    if (windows) ..._msvcFlags else ...['-std=c++20', '-w'],
-    if (libcxx != null) ...[
-      '-nostdinc++',
-      '-isystem',
-      '$libcxx/usr/lib/llvm-21/include/c++/v1',
-      '-isystem',
-      '$libcxx/usr/lib/llvm-21/include',
-    ],
-  ];
-  // The static library CBuilder writes for [name] (Windows: `<name>.lib`).
-  String windowsStaticLibrary(String name) =>
-      _slash(File.fromUri(input.outputDirectory.resolve('$name.lib')).path);
-
-  // The glTF 2 exporter, compiled with the glTF headers visible.
-  await CBuilder.library(
-    name: _gltfLibrary,
-    assetName: null,
-    linkModePreference: LinkModePreference.static,
-    sources: [for (final source in _gltfSources) 'third_party/assimp/$source'],
-    includes: includes,
-    defines: defines(gltfHeaders: true),
-    flags: cxxFlags,
-  ).run(input: input, output: output, logger: logger);
-
-  // minizip (zipped Collada .zae) is C. On Windows it compiles with the rest
-  // (cl.exe picks the language by extension); clang rejects -std=c++20 for C
-  // files, so elsewhere it becomes a static library of its own.
-  final unzipSources = [
-    'third_party/assimp/contrib/unzip/ioapi.c',
-    'third_party/assimp/contrib/unzip/unzip.c',
-  ];
-  if (!windows) {
-    await CBuilder.library(
-      name: _unzipLibrary,
-      assetName: null,
-      linkModePreference: LinkModePreference.static,
-      sources: unzipSources,
-      includes: const ['third_party/assimp/contrib/unzip'],
-      defines: const {'ASSIMP_BUILD_NO_OWN_ZLIB': null},
-      flags: const ['-w'],
-    ).run(input: input, output: output, logger: logger);
-  }
-
-  // The rest of the Assimp C++ sources, as tool/vendor_assimp.dart listed
-  // them (the exporter and minizip are handled above).
+  // The Assimp sources as tool/vendor_assimp.dart listed them, minizip's C
+  // files (zipped Collada .zae) among them, plus zlib on Windows.
   final list = File.fromUri(assimp.resolve('sources.txt'));
   final sources = [
     for (final line in list.readAsLinesSync().map((l) => l.trim()))
       if (line.isNotEmpty &&
           !line.startsWith('#') &&
-          !line.endsWith('.c') &&
-          !_gltfSources.contains(line))
+          !_gltfExporterSources.contains(line))
         assimp.resolve(line),
-    if (windows) ...[
-      for (final source in unzipSources) input.packageRoot.resolve(source),
+    // The glTF 2 exporter needs the glTF headers, which the disabled glTF
+    // importers hide: these wrappers undefine that switch and include it.
+    for (final wrapper in _gltfExporterWrappers)
+      input.packageRoot.resolve(wrapper),
+    if (windows)
       for (final source in _zlibSources) zlib.resolve(source),
-    ],
   ];
   // The sources go to the compiler through a response file: their absolute
   // paths overflow the Windows command line (cl.exe runs through cmd.exe with
@@ -245,53 +183,77 @@ Future<void> _buildVendored(
   );
   output.dependencies.addAll([list.uri, ...sources]);
 
-  // Language.cpp makes native_toolchain_c link the platform's C++ standard
-  // library, but it also passes `-x c++` (and /TP on Windows, which would
-  // compile zlib as C++). So it is used only on clang without the bundled
-  // libc++, which is linked by path.
-  final cppLanguage = !windows && libcxx == null;
+  // One compiler run for C and C++ alike: the compiler picks the language by
+  // extension (Language.cpp would force C++ onto the C files), so the C++
+  // standard library is linked explicitly below. clang gets no -std flag,
+  // which it would reject for the C files; its default (gnu++17 since
+  // clang 16) is what Assimp and the bridge need. MSVC applies /std to C++
+  // only.
   final cbuilder = CBuilder.library(
     name: input.packageName,
     assetName: _assetName,
-    language: cppLanguage ? Language.cpp : Language.c,
     sources: const ['src/assimp_bridge.cpp', 'src/assimp_exporters_stub.cpp'],
-    includes: includes,
-    defines: defines(gltfHeaders: false),
+    includes: [
+      'src',
+      'third_party/assimp',
+      'third_party/assimp/code',
+      'third_party/assimp/include',
+      'third_party/assimp/contrib/irrXML',
+      'third_party/assimp/contrib/rapidjson/include',
+      'third_party/assimp/contrib/unzip',
+      if (windows) 'third_party/zlib',
+    ],
+    defines: {
+      // Every importer but the seven the bridge reads; Assimp's importer
+      // registry then registers exactly those (FBX, OBJ, Collada, 3DS, PLY,
+      // DirectX, STL), so FLUTTER_ASSIMP_EXTRA_IMPORTERS stays undefined.
+      for (final importer in _disabledImporters)
+        'ASSIMP_BUILD_NO_${importer}_IMPORTER': null,
+      'ASSIMP_BUILD_NO_OWN_ZLIB': null,
+    },
     flags: [
-      ...cxxFlags,
-      if (windows) '/MP',
+      if (windows) ...[..._msvcFlags, '/MP'] else '-w',
+      if (libcxx != null) ...[
+        '-nostdinc++',
+        '-isystem',
+        '$libcxx/usr/lib/llvm-21/include/c++/v1',
+        '-isystem',
+        '$libcxx/usr/lib/llvm-21/include',
+      ],
       '@${_slash(rsp.path)}',
-      // cl.exe hands .lib inputs to the linker; clang gets `-l` below.
-      if (windows) windowsStaticLibrary(_gltfLibrary),
       if (libcxx != null) ...[
         '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++.a',
         '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++abi.a',
       ],
-      if (targetOS == OS.linux) ...['-ldl', '-lpthread'],
     ],
+    // After the objects on the link line.
     libraries: [
-      if (!windows) ...[_gltfLibrary, _unzipLibrary, 'z'],
+      if (!windows) 'z',
+      if (libcxx == null)
+        ...switch (targetOS) {
+          OS.linux => ['stdc++'],
+          OS.macOS || OS.iOS => ['c++'],
+          OS.android => ['c++_static', 'c++abi'],
+          _ => const <String>[],
+        },
+      if (targetOS == OS.linux) ...['dl', 'pthread'],
     ],
-    libraryDirectories: [if (!windows) '.'],
-    // A source build links libc++ statically on Android, so the app needs no
-    // libc++_shared.so; elsewhere the platform default applies (MSVC's CRT,
-    // libstdc++ on Linux, libc++ on Apple platforms).
-    cppLinkStdLib: cppLanguage && targetOS == OS.android ? 'c++_static' : null,
   );
   await cbuilder.run(input: input, output: output, logger: logger);
 }
 
 const _assetName = 'src/third_party/assimp_c.g.dart';
 
-const _unzipLibrary = 'flutter_assimp_unzip';
-
-const _gltfLibrary = 'flutter_assimp_gltf';
-
-/// The glTF 2 exporter's sources: unlike the rest they need the glTF headers,
-/// which `ASSIMP_BUILD_NO_GLTF_IMPORTER` hides.
-const _gltfSources = [
+/// The glTF 2 exporter's sources in `third_party/assimp/sources.txt`, built
+/// through [_gltfExporterWrappers] instead.
+const _gltfExporterSources = [
   'code/glTF/glTFCommon.cpp',
   'code/glTF2/glTF2Exporter.cpp',
+];
+
+const _gltfExporterWrappers = [
+  'src/vendored/vendored_gltf_common.cpp',
+  'src/vendored/vendored_gltf2_exporter.cpp',
 ];
 
 const _msvcFlags = [

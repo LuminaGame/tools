@@ -11,6 +11,7 @@ class RigInstance {
 
   RigInstance._(this._handle);
 
+  /// The native instance. Throws [StateError] after [dispose].
   Pointer<RlRigInstance> get handle {
     if (_isDisposed) {
       throw StateError('RigInstance is already disposed');
@@ -18,6 +19,9 @@ class RigInstance {
     return _handle;
   }
 
+  /// Creates an instance of [rigLogic]'s rig with all controls at zero.
+  ///
+  /// Throws [UnsupportedError] when the native library is not loaded.
   factory RigInstance.create(RigLogic rigLogic) {
     final bindings = RigLogicBindings.instance;
     if (!bindings.isAvailable) {
@@ -30,21 +34,28 @@ class RigInstance {
     return RigInstance._(handle);
   }
 
+  /// The number of raw controls (`DnaReader.rawControlCount`).
   int get rawControlCount =>
       RigLogicBindings.instance.rigInstanceGetRawControlCount(handle);
 
+  /// The value of raw control [index].
   double getRawControl(int index) =>
       RigLogicBindings.instance.rigInstanceGetRawControl(handle, index);
 
+  /// Sets raw control [index] to [value] (usually 0 to 1); takes effect on
+  /// the next [RigLogic.calculate].
   void setRawControl(int index, double value) {
     RigLogicBindings.instance.rigInstanceSetRawControl(handle, index, value);
   }
 
+  /// The level of detail evaluated (0 is the most detailed).
   int get lod => RigLogicBindings.instance.rigInstanceGetLod(handle);
 
   set lod(int value) =>
       RigLogicBindings.instance.rigInstanceSetLod(handle, value);
 
+  /// The joint outputs of the last [RigLogic.calculate]: per joint, the
+  /// translation, rotation and scale values OpenRigLogic computes.
   List<double> getJointOutputs() {
     final bindings = RigLogicBindings.instance;
     final ptrPtr = calloc<Pointer<Float>>();
@@ -64,6 +75,8 @@ class RigInstance {
     }
   }
 
+  /// The blend shape channel weights of the last [RigLogic.calculate], one per
+  /// `DnaReader.getBlendShapeChannelName`.
   List<double> getBlendShapeOutputs() {
     final bindings = RigLogicBindings.instance;
     final ptrPtr = calloc<Pointer<Float>>();
@@ -83,6 +96,8 @@ class RigInstance {
     }
   }
 
+  /// The animated map values of the last [RigLogic.calculate], one per
+  /// `DnaReader.getAnimatedMapName`.
   List<double> getAnimatedMapOutputs() {
     final bindings = RigLogicBindings.instance;
     final ptrPtr = calloc<Pointer<Float>>();
@@ -102,6 +117,7 @@ class RigInstance {
     }
   }
 
+  /// Releases the native instance.
   void dispose() {
     if (!_isDisposed) {
       _isDisposed = true;

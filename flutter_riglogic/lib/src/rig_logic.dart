@@ -11,6 +11,7 @@ class RigLogic {
 
   RigLogic._(this._handle);
 
+  /// The native evaluator. Throws [StateError] after [dispose].
   Pointer<RlRigLogic> get handle {
     if (_isDisposed) {
       throw StateError('RigLogic is already disposed');
@@ -18,6 +19,9 @@ class RigLogic {
     return _handle;
   }
 
+  /// Builds the evaluator from the rig definition and behaviour in [reader].
+  ///
+  /// Throws [UnsupportedError] when the native library is not loaded.
   factory RigLogic.create(DnaReader reader) {
     final bindings = RigLogicBindings.instance;
     if (!bindings.isAvailable) {
@@ -30,10 +34,13 @@ class RigLogic {
     return RigLogic._(handle);
   }
 
+  /// Evaluates the rig for [instance]'s current controls and LOD, filling its
+  /// joint, blend shape and animated map outputs.
   void calculate(RigInstance instance) {
     RigLogicBindings.instance.rigLogicCalculate(handle, instance.handle);
   }
 
+  /// Releases the native evaluator. Dispose its [RigInstance]s first.
   void dispose() {
     if (!_isDisposed) {
       _isDisposed = true;

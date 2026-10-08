@@ -1,103 +1,88 @@
-[Türkçe](README.tr.md)
+[Türkçe](https://github.com/LuminaGame/tools/blob/main/flutter_riglogic/README.tr.md)
 
 # flutter_riglogic
 
-Dart FFI bindings to Epic Games' [OpenRigLogic](https://github.com/EpicGames/openriglogic) and its DNA reader. Lumina uses it to evaluate MetaHuman facial rigs in real time.
+Dart FFI bindings to Epic Games' [OpenRigLogic](https://github.com/EpicGames/openriglogic) and its DNA reader: read a MetaHuman `.dna` file and evaluate its facial rig in real time, from control values to joint transforms, blend shape weights and animated map values. The native code is compiled from the bundled OpenRigLogic sources by the package's native-assets build hook, so there is nothing to install besides a C++ compiler. [Lumina](https://github.com/LuminaGame/lumina) uses it to drive MetaHuman faces.
 
-OpenRigLogic computes rig outputs (joint transforms, blend shape weights, animated map values) from input control values. This package wraps it in three classes:
+## Features
 
-- `DnaReader` reads a binary `.dna` file (from disk or memory): name, LOD count, joints, blend shape channels, raw and GUI controls, animated maps.
-- `RigLogic` builds the rig evaluator from a `DnaReader`.
-- `RigInstance` holds one character's control values, LOD and calculated outputs.
+- `DnaReader`: reads a binary `.dna` from disk or memory: name, LOD count, joints, blend shape channels, raw and GUI controls, animated maps.
+- `RigLogic`: the rig evaluator built from a `DnaReader` (joints, blend shapes, animated maps, PSD, RBF and machine-learned behaviour).
+- `RigInstance`: one character's control values, LOD and calculated outputs.
+- No CMake, no prebuilt binaries: the hook compiles OpenRigLogic and the C wrapper with the platform's toolchain on the first build and caches the result.
 
-The C wrapper (`src/riglogic_c.h`, `src/riglogic_c.cpp`) is compiled by the package's native-assets hook (`hook/build.dart`) and links a static OpenRigLogic library that you build once from the vendored sources.
+## Platform support
 
-Platforms: Linux and Windows (the hook also has a macOS branch).
-
-## Requirements
-
-- Linux: clang, CMake and the bundled libc++ from the [lumina](https://github.com/LuminaGame/lumina) repository (`flutter_filament/third_party/libcxx`).
-- Windows: Visual Studio 2022 with the C++ workload, CMake and Ninja.
-
-## Building OpenRigLogic
-
-OpenRigLogic (MIT) is vendored under `third_party/openriglogic/`. Build the static library before the first `flutter run` / `flutter test`:
-
-```bash
-bash tool/build_openriglogic.sh     # Linux: clang + bundled libc++, -fPIC -> third_party/openriglogic/lib/libriglogic.a
-```
-
-```bat
-tool\build_openriglogic.bat                     :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
-```
-
-```bash
-# Android cross-compilation (arm64-v8a and x86_64; requires Android NDK):
-tool\build_openriglogic_android.bat [abi]       # Windows host -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
-bash tool/build_openriglogic_android.sh [abi]   # Linux host   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
-```
-
-The Linux script finds libc++ through `LUMINA_LIBCXX_DIR`, else `../../lumina/flutter_filament/third_party/libcxx`. The Windows script sets up the MSVC environment with `vswhere` when it is not already active. The Android scripts detect the Android NDK from `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT`, or the default SDK NDK location, using `libc++_shared` and clang.
-
-## Where the hook finds its inputs
-
-| What | In order |
+| Platform | Status |
 |---|---|
-| OpenRigLogic library | 1. `LUMINA_RIGLOGIC_LIB_DIR` (only when the hook is run directly; the hooks runner does not forward `LUMINA_*` variables) 2. `riglogic_lib_dir` under `hooks: user_defines: flutter_riglogic:` in the workspace root pubspec, relative to that pubspec, when the library is there 3. `<package root>/third_party/openriglogic/lib` |
-| libc++ (Linux) | 1. `LUMINA_LIBCXX_DIR` 2. the `libcxx_dir` user-define 3. `<package root>/../../lumina/flutter_filament/third_party/libcxx` |
+| Windows x64 | Verified (`flutter test`, `flutter build windows`) |
+| Linux x64 | Verified (`flutter test`, `flutter build linux`) |
+| Android arm64 | Builds and links (`flutter build apk`); libc++ is linked statically |
+| macOS, iOS | Expected to build with Xcode's clang; not verified yet |
+| Web | Not supported (`dart:ffi`) |
 
-A `riglogic_lib_dir` that does not hold the library yields to the package's own build, so an app can name the folder it links a prebuilt library into while a development checkout of this package keeps the library built in place. The hook stops with an error naming the build script when `libriglogic.a` / `riglogic.lib` is missing from both. A git dependency lives in the pub cache, where the library is not built, so point `riglogic_lib_dir` at a checkout where you ran the build script:
+## Getting started
 
-```yaml
-dependencies:
-  flutter_riglogic:
-    git:
-      url: https://github.com/LuminaGame/tools.git
-      path: flutter_riglogic
-
-hooks:
-  user_defines:
-    flutter_riglogic:
-      riglogic_lib_dir: ../tools/flutter_riglogic/third_party/openriglogic/lib
-      libcxx_dir: flutter_filament/third_party/libcxx   # Linux only
+```bash
+flutter pub add flutter_riglogic
 ```
+
+Requirements: Dart 3.12 or later (Flutter with native assets), and the platform's C++ toolchain:
+
+- Windows: Visual Studio 2022 (or the Build Tools) with the "Desktop development with C++" workload.
+- Linux: `clang` (the Flutter Linux desktop prerequisites already include it).
+- Android: the Android NDK that Flutter's Android toolchain installs.
+- macOS / iOS: Xcode.
 
 ## Usage
 
 ```dart
 import 'package:flutter_riglogic/flutter_riglogic.dart';
 
-final reader = DnaReader.fromFile('assets/face.dna');
-print('${reader.name}: ${reader.jointCount} joints, '
-    '${reader.blendShapeChannelCount} blend shapes, ${reader.rawControlCount} raw controls');
+void evaluate(String dnaPath) {
+  final reader = DnaReader.fromFile(dnaPath);
+  print('${reader.name}: ${reader.jointCount} joints, '
+      '${reader.blendShapeChannelCount} blend shapes, '
+      '${reader.rawControlCount} raw controls');
 
-final rig = RigLogic.create(reader);
-final instance = RigInstance.create(rig)..lod = 0;
+  final rig = RigLogic.create(reader);
+  final instance = RigInstance.create(rig)..lod = 0;
 
-instance.setRawControl(0, 1.0);
-rig.calculate(instance);
+  instance.setRawControl(0, 1.0);
+  rig.calculate(instance);
 
-final joints = instance.getJointOutputs();          // List<double>
-final weights = instance.getBlendShapeOutputs();    // List<double>
-final maps = instance.getAnimatedMapOutputs();      // List<double>
+  final joints = instance.getJointOutputs(); // List<double>
+  final weights = instance.getBlendShapeOutputs(); // List<double>
+  final maps = instance.getAnimatedMapOutputs(); // List<double>
+  print('${joints.length} joint values, ${weights.length} weights, ${maps.length} maps');
 
-instance.dispose();
-rig.dispose();
-reader.dispose();
+  instance.dispose();
+  rig.dispose();
+  reader.dispose();
+}
 ```
 
-`DnaReader.fromMemory(bytes)` reads a DNA that is already in memory. The factories throw `UnsupportedError` when the native library is not loaded.
+`DnaReader.fromMemory(bytes)` reads a DNA that is already in memory (for example from `rootBundle`). The factories throw `UnsupportedError` when the native library is not loaded. Every object owns native memory: call `dispose()` when you are done.
 
-`example/` is a Flutter app that loads `assets/sample.dna` and drives the rig's controls. From the package folder, `dart run tool/inspect_dna.dart` prints the joints, blend shapes and controls of `test/fixtures/sample.dna`.
+The [example](https://github.com/LuminaGame/tools/tree/main/flutter_riglogic/example) is a Flutter app that loads a small DNA, lists its raw controls as sliders and shows the evaluated outputs.
 
-## Tests
+## How the native library is built
 
-```bash
-flutter test test/dna_reader_test.dart test/rig_logic_test.dart
-```
+`hook/build.dart` builds `flutter_riglogic` as a dynamic library and bundles it as a code asset; Dart calls it through `@Native` bindings.
 
-They run against the real binary DNA fixture `test/fixtures/sample.dna`.
+- **From source (default).** The hook compiles the C wrapper (`src/riglogic_c.cpp`) together with the vendored OpenRigLogic sources (`third_party/openriglogic/src`, about 100 files). The first build takes about 20 seconds; later builds reuse the cached library.
+- **Prebuilt static library (optional).** When `third_party/openriglogic/lib` (or the folder named by the `riglogic_lib_dir` user-define) holds `riglogic.lib` / `libriglogic.a`, only the wrapper is compiled and that library is linked. `tool/build_openriglogic.{sh,bat}` and `tool/build_openriglogic_android.{sh,bat}` build it with CMake. An app sets the user-define in its root pubspec, relative to that pubspec:
 
-## License
+  ```yaml
+  hooks:
+    user_defines:
+      flutter_riglogic:
+        riglogic_lib_dir: third_party/openriglogic/lib
+        libcxx_dir: path/to/libcxx   # Linux only, a libc++ the prebuilt library was built against
+  ```
 
-GPL-3.0 (see [LICENSE](LICENSE)). The vendored OpenRigLogic in `third_party/openriglogic/` is MIT-licensed by Epic Games (see its [LICENSE](third_party/openriglogic/LICENSE)).
+## Additional information
+
+- Source, issues and contributions: [LuminaGame/tools](https://github.com/LuminaGame/tools) ([issues](https://github.com/LuminaGame/tools/issues)). Tests: `flutter test test/dna_reader_test.dart test/rig_logic_test.dart` (they read the real DNA fixture `test/fixtures/sample.dna`); `dart run tool/inspect_dna.dart` prints that fixture's joints, blend shapes and controls.
+- License: GPL-3.0 (see [LICENSE](LICENSE)). The bundled OpenRigLogic is MIT-licensed by Epic Games; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- MetaHuman DNA files from Epic's MetaHuman tools are subject to Epic's own license terms; this package ships only a small synthetic test DNA.

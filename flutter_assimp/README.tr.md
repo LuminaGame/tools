@@ -1,101 +1,98 @@
-[English](README.md)
+[English](https://github.com/LuminaGame/tools/blob/main/flutter_assimp/README.md)
 
 # flutter_assimp
 
-In-process 3D model dönüşümü için [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) Dart FFI binding'leri. Küçük bir C bridge (`src/assimp_bridge.cpp`) modeli Assimp ile yükler ve glTF 2.0 binary (GLB) olarak yazar. Lumina bunu FBX, OBJ, Collada (DAE), 3DS, PLY, DirectX (X) ve STL dosyalarını GLB tabanlı asset pipeline'ına import etmek için kullanır.
+3D modelleri uygulamanın içinde glTF 2.0 binary'ye (GLB) dönüştürmek için [Open Asset Import Library (Assimp)](https://github.com/assimp/assimp) Dart FFI binding'leri: FBX, OBJ, Collada, 3DS, PLY, DirectX ve STL girer; bir GLB ve neyin dönüştürüldüğünü anlatan bir JSON raporu çıkar. Küçük bir C bridge (`src/assimp_bridge.cpp`) Assimp'i sürer; paketin native-assets build hook'u onu paketle gelen Assimp kaynaklarıyla birlikte derler, C++ derleyicisi dışında kurulacak bir şey yoktur. [Lumina](https://github.com/LuminaGame/lumina) modelleri GLB tabanlı asset pipeline'ına bununla import eder.
 
-Bridge, paketin native assets hook'u (`hook/build.dart`) tarafından ilk `flutter run` / `flutter test` sırasında derlenir; elle yapılacak bir build adımı yoktur. Assimp'i kendisi build etmez, bir Google Filament build'indeki Assimp kütüphanesini link eder.
+## Özellikler
 
-Platformlar: Linux ve Windows (hook'ta bir macOS dalı da var).
+- Dosyadan dosyaya (`convertFileToGlb`), dosyadan rapor ile birlikte byte'lara (`convertFileForImport`) ve byte'lardan byte'lara (`convertMemoryToGlb`).
+- FBX (binary ve ASCII), OBJ (+MTL), Collada (`.dae`, zip'li `.zae`), 3DS, PLY, DirectX (`.x`) ve STL okur.
+- İsteğe bağlı normalize: kaynağın birim ölçeğini ve eksen sistemini (FBX GlobalSettings) sahneye işler; GLB standart glTF olur (metre, +Y yukarı, +Z ön).
+- İsteğe bağlı collision hull mesh'lerinin (`UCX_`, `UBX_`, `USP_`, `UCP_`) çıkarılması; noktaları ve üçgenleriyle raporda döner.
+- Kaynak metadata'sı, animasyon take'leri, mesh, skinned mesh, materyal ve node sayıları ile materyal başına renkler, PBR değerleri ve texture yollarını içeren bir rapor.
+- Skinned mesh'ler ve animasyonlar korunur (take başına bir glTF animasyonu).
 
-## Gereksinimler
+## Platform desteği
 
-- Prebuilt **Google Filament v1.77.0** ([lumina](https://github.com/LuminaGame/lumina) repo'sunda anlatılan local patch'lerle). Hook şunları kullanır:
-  - `<filament>/third_party/libassimp` içindeki Assimp kaynakları ve header'ları: Filament'in Assimp kütüphanesinde yalnız FBX ve OBJ importer'ları vardır, bu yüzden hook Collada, 3DS, PLY, DirectX ve STL importer'larını da (`contrib/irrXML`, `contrib/unzip` ve `third_party/libz` header'larıyla) `third_party/libassimp/code` klasöründen, kaynaklar oradaysa derler; yoksa bridge yalnız FBX ve OBJ okur;
-  - Linux / macOS: `<filament>/out/cmake-release/third_party/libassimp/tnt/libassimp.a` ve `third_party/zstd/tnt/libzstd.a`;
-  - Windows: `<filament>/out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib`, `zstd/tnt/zstd.lib`, `libz/tnt/z.lib`.
-- Linux: clang ve lumina repo'sundaki bundled libc++ (`flutter_filament/third_party/libcxx`).
-- Windows: C++ workload'u kurulu Visual Studio 2022.
-
-## Hook, Filament'i ve libc++'ı nerede bulur
-
-| Ne | Sırayla |
+| Platform | Durum |
 |---|---|
-| Filament | 1. `LUMINA_FILAMENT_DIR` (yalnızca hook doğrudan çalıştırıldığında; hooks runner `LUMINA_*` değişkenlerini iletmez) 2. workspace root pubspec'te `hooks: user_defines: flutter_assimp:` altındaki `filament_dir`, o pubspec'e göre relative 3. `<paket root>/../filament` |
-| libc++ (Linux) | 1. `LUMINA_LIBCXX_DIR` 2. `libcxx_dir` user-define'ı 3. `<paket root>/../../lumina/flutter_filament/third_party/libcxx` |
+| Windows x64 | Doğrulandı (`flutter test`, `flutter build windows`) |
+| Linux x64 | Doğrulandı (`flutter test`, `flutter build linux`) |
+| Android arm64 | Build ve link oluyor (`flutter build apk`); libc++ static link edilir |
+| macOS, iOS | Xcode clang'ıyla derlenmesi beklenir; henüz doğrulanmadı |
+| Web | Desteklenmez (`dart:ffi`) |
 
-Git dependency olarak kullanıldığında paket pub cache'te durur; user-define'ları uygulamanızın root pubspec'inde verin:
+## Başlarken
 
-```yaml
-dependencies:
-  flutter_assimp:
-    git:
-      url: https://github.com/LuminaGame/tools.git
-      path: flutter_assimp
-
-hooks:
-  user_defines:
-    flutter_assimp:
-      filament_dir: filament                          # bu pubspec'e göre relative
-      libcxx_dir: flutter_filament/third_party/libcxx # yalnızca Linux
+```bash
+flutter pub add flutter_assimp
 ```
+
+Gereksinimler: Dart 3.12 veya sonrası (native assets destekli Flutter) ve platformun C++ toolchain'i:
+
+- Windows: "Desktop development with C++" workload'u kurulu Visual Studio 2022 (ya da Build Tools).
+- Linux: `clang` ve zlib header'ları (`zlib1g-dev`; Flutter Linux desktop gereksinimleri bunları zaten getirir).
+- Android: Flutter'ın Android toolchain'inin kurduğu Android NDK.
+- macOS / iOS: Xcode.
 
 ## Kullanım
 
 ```dart
 import 'package:flutter_assimp/flutter_assimp.dart';
 
-if (FlutterAssimp.isAvailable) {
-  print(FlutterAssimp.version); // ör. "5.0 (commit 4673545f)"
+Future<void> convert() async {
+  if (FlutterAssimp.isAvailable) {
+    print(FlutterAssimp.version); // ör. "5.0 (commit 4673545f)"
+  }
+
+  // Dosyadan dosyaya.
+  final ok = await FlutterAssimp.convertFileToGlb('crate.fbx', 'crate.glb');
+  if (!ok) print(FlutterAssimp.lastError);
+
+  // Import pipeline'ı için: GLB byte'ları ve bir rapor.
+  final result = FlutterAssimp.convertFileForImport(
+    'SM_Barrel.fbx',
+    options: AssimpConvertOptions.all, // normalize | stripCollision
+  );
+  if (result.success) {
+    final glb = result.glb!; // Uint8List
+    print('${glb.length} bytes, unit scale ${result.report['unit_scale']}, '
+        'hulls ${result.report['collision']}');
+  } else {
+    print(result.error);
+  }
+
+  // Bellekte; `hint` kaynak formatın uzantısıdır.
+  final bytes = await File('crate.obj').readAsBytes();
+  final fromMemory = await FlutterAssimp.convertMemoryToGlb(bytes, hint: 'obj');
+  print(fromMemory?.length);
+
+  print(FlutterAssimp.isSupportedFormat('model.dae')); // true
 }
-
-// Dosyadan dosyaya. Native bridge yüklü değilse PATH'teki `assimp`
-// CLI'ına düşer.
-final ok = await FlutterAssimp.convertFileToGlb('crate.fbx', 'crate.glb');
-if (!ok) print(FlutterAssimp.lastError);
-
-// Import pipeline'ı için: yalnızca native bridge, GLB byte'ları ve bir rapor.
-final result = FlutterAssimp.convertFileForImport(
-  'SM_Barrel.fbx',
-  options: AssimpConvertOptions.all, // normalize | stripCollision
-);
-if (result.success) {
-  final glb = result.glb!;              // Uint8List
-  final unitScale = result.report['unit_scale'];
-  final hulls = result.report['collision'];
-} else {
-  print(result.error);
-}
-
-// Bellekte; `hint` kaynak formatın uzantısıdır.
-final glb = await FlutterAssimp.convertMemoryToGlb(bytes, hint: 'obj');
-
-FlutterAssimp.isSupportedFormat('model.dae'); // true: FlutterAssimp.importExtensions'tan biri
 ```
 
-`AssimpConvertOptions`:
+(`File`, `dart:io`'dan gelir.) `AssimpConvertOptions.normalize` birimleri ve eksenleri işler, `AssimpConvertOptions.stripCollision` collision hull'larını çıkarır ve raporda listeler. Native bridge yüklenmemişse `convertFileToGlb`, `PATH`'teki `assimp` komut satırı aracına düşer; diğer çağrılar bridge'e ihtiyaç duyar. `AssimpBindings` bridge'e düşük seviyeli erişim verir.
 
-- `normalize`, kaynağın birim ölçeğini ve eksen sistemini (FBX GlobalSettings) sahneye işler; GLB metre cinsinden, +Y up, +Z front olarak çıkar.
-- `stripCollision`, collision hull mesh'lerini (adı `UCX_`, `UBX_`, `USP_`, `UCP_` ile başlayanlar) kaldırır ve raporda listeler.
+Tam bir dönüşüm için [example/main.dart](https://github.com/LuminaGame/tools/blob/main/flutter_assimp/example/main.dart)'a bakın.
 
-Rapor (`AssimpImportConversion.report`) ayrıca kaynak metadata'sını, eksenleri, animation take'lerini, mesh / skinned mesh / material / node sayılarını ve material başına detayları (renkler, PBR değerleri, texture path'leri) içerir. `AssimpBindings` bridge'e low-level erişim sağlar.
+## Native kütüphane nasıl derlenir
 
-## Development
+`hook/build.dart`, `flutter_assimp`'i dynamic library olarak derler ve code asset olarak paketler; Dart onu `@Native` binding'leriyle çağırır.
 
-`src/assimp_bridge.h` değişince `@Native` binding'lerini (`lib/src/third_party/assimp_c.g.dart`) yeniden üretin:
+- **Paketle gelen kaynaklardan (varsayılan).** Hook bridge'i `third_party/assimp` altındaki Assimp 5.0 kaynaklarıyla (Google Filament'in patch'lenmiş Assimp kopyası; yukarıdaki importer'lara ve glTF 2 exporter'a indirgenmiş) tek bir derleyici çalıştırmasında derler. zlib Windows'ta `third_party/zlib`'den, diğer platformlarda sistemden gelir. İlk build masaüstü bir makinede yaklaşık 20 saniye sürer; sonraki build'ler cache'lenmiş kütüphaneyi kullanır. `tool/vendor_assimp.dart` paketle gelen kaynakları bir Filament checkout'undan yeniler.
+- **Bir Filament build'ine karşı (isteğe bağlı).** `filament_dir` user-define'ı (uygulamanın root pubspec'ine göreli) Assimp static kütüphanesi olan bir Google Filament build'ini gösteriyorsa (Windows'ta `out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib`, diğerlerinde `out/cmake-release/third_party/libassimp/tnt/libassimp.a`), hook o kütüphaneyi link eder ve yalnızca bridge'i, exporter'ı ve ek importer'ları derler. Lumina böyle build eder:
 
-```bash
-dart run tool/ffigen.dart
-```
+  ```yaml
+  hooks:
+    user_defines:
+      flutter_assimp:
+        filament_dir: filament
+        libcxx_dir: flutter_filament/third_party/libcxx # yalnızca Linux: Filament'in build edildiği libc++
+  ```
 
-Test'ler:
+## Ek bilgiler
 
-```bash
-flutter test test/flutter_assimp_test.dart test/fbx_import_conversion_test.dart
-```
-
-Dönüşüm test'leri [test-assets](https://github.com/LuminaGame/test-assets) repo'sundaki gerçek FBX dosyalarını kullanır (`../test-assets` ya da `LUMINA_TEST_ASSETS`); dosyalar yoksa skip edilir.
-
-## Lisans
-
-GPL-3.0 (bkz. [LICENSE](LICENSE)). Assimp BSD-3-Clause, Google Filament Apache-2.0 lisanslıdır; ikisi de kendi lisansını korur.
+- Kaynak, issue'lar ve katkı: [LuminaGame/tools](https://github.com/LuminaGame/tools) ([issue'lar](https://github.com/LuminaGame/tools/issues)).
+- Testler: `flutter test test/import_formats_test.dart test/fbx_import_conversion_test.dart`. FBX testleri Lumina'nın test-assets klasöründeki gerçek Unreal export'larını okur (`../test-assets` ya da `LUMINA_TEST_ASSETS`); klasör yoksa atlanır. `src/assimp_bridge.h` değişince binding'leri `dart run tool/ffigen.dart` ile yeniden üretin.
+- Lisans: GPL-3.0 ([LICENSE](LICENSE)). Paketle gelen Assimp (BSD-3-Clause), contrib kütüphaneleri ve zlib kendi lisanslarını korur; bkz. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

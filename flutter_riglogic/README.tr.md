@@ -1,103 +1,88 @@
-[English](README.md)
+[English](https://github.com/LuminaGame/tools/blob/main/flutter_riglogic/README.md)
 
 # flutter_riglogic
 
-Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi ve DNA reader'ı için Dart FFI binding'leri. Lumina bunu MetaHuman yüz rig'lerini real-time hesaplamak için kullanır.
+Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi ve DNA reader'ı için Dart FFI binding'leri: bir MetaHuman `.dna` dosyasını okur ve yüz rig'ini real-time hesaplar; control değerlerinden joint transform'larına, blend shape ağırlıklarına ve animated map değerlerine. Native kod, paketin native-assets build hook'u tarafından paketle gelen OpenRigLogic kaynaklarından derlenir; C++ derleyicisi dışında kurulacak bir şey yoktur. [Lumina](https://github.com/LuminaGame/lumina) MetaHuman yüzlerini bununla sürer.
 
-OpenRigLogic, input control değerlerinden rig output'larını (joint transform'ları, blend shape ağırlıkları, animated map değerleri) hesaplar. Bu paket onu üç sınıfla sarar:
+## Özellikler
 
-- `DnaReader`, binary bir `.dna` dosyasını (diskten ya da bellekten) okur: isim, LOD sayısı, joint'ler, blend shape channel'ları, raw ve GUI control'ler, animated map'ler.
-- `RigLogic`, bir `DnaReader`'dan rig evaluator'ı kurar.
-- `RigInstance`, tek bir karakterin control değerlerini, LOD'unu ve hesaplanan output'larını tutar.
+- `DnaReader`: binary bir `.dna`'yı diskten ya da bellekten okur: isim, LOD sayısı, joint'ler, blend shape channel'ları, raw ve GUI control'ler, animated map'ler.
+- `RigLogic`: bir `DnaReader`'dan kurulan rig evaluator (joint'ler, blend shape'ler, animated map'ler, PSD, RBF ve machine-learned behavior).
+- `RigInstance`: tek bir karakterin control değerleri, LOD'u ve hesaplanan output'ları.
+- CMake yok, prebuilt binary yok: hook OpenRigLogic'i ve C wrapper'ı ilk build'de platformun toolchain'iyle derler ve sonucu cache'ler.
 
-C wrapper (`src/riglogic_c.h`, `src/riglogic_c.cpp`) paketin native assets hook'u (`hook/build.dart`) tarafından derlenir ve vendored kaynaklardan bir kere build ettiğiniz static OpenRigLogic kütüphanesini link eder.
+## Platform desteği
 
-Platformlar: Linux ve Windows (hook'ta bir macOS dalı da var).
-
-## Gereksinimler
-
-- Linux: clang, CMake ve [lumina](https://github.com/LuminaGame/lumina) repo'sundaki bundled libc++ (`flutter_filament/third_party/libcxx`).
-- Windows: C++ workload'u kurulu Visual Studio 2022, CMake ve Ninja.
-
-## OpenRigLogic'i build etmek
-
-OpenRigLogic (MIT) `third_party/openriglogic/` altında vendored olarak gelir. İlk `flutter run` / `flutter test` öncesinde static kütüphaneyi build edin:
-
-```bash
-bash tool/build_openriglogic.sh     # Linux: clang + bundled libc++, -fPIC -> third_party/openriglogic/lib/libriglogic.a
-```
-
-```bat
-tool\build_openriglogic.bat                     :: Windows: MSVC, static CRT (/MT) -> third_party\openriglogic\lib\riglogic.lib
-```
-
-```bash
-# Android cross-compilation (arm64-v8a ve x86_64; Android NDK gerektirir):
-tool\build_openriglogic_android.bat [abi]       # Windows host -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
-bash tool/build_openriglogic_android.sh [abi]   # Linux host   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
-```
-
-Linux script'i libc++'ı `LUMINA_LIBCXX_DIR` üzerinden, yoksa `../../lumina/flutter_filament/third_party/libcxx` altında bulur. Windows script'i MSVC environment'ı aktif değilse `vswhere` ile kurar. Android script'leri Android NDK'yı `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` veya standart SDK NDK dizininden tespit ederek `libc++_shared` ve clang ile derleme yapar.
-
-## Hook input'larını nerede bulur
-
-| Ne | Sırayla |
+| Platform | Durum |
 |---|---|
-| OpenRigLogic kütüphanesi | 1. `LUMINA_RIGLOGIC_LIB_DIR` (yalnızca hook doğrudan çalıştırıldığında; hooks runner `LUMINA_*` değişkenlerini iletmez) 2. workspace root pubspec'te `hooks: user_defines: flutter_riglogic:` altındaki `riglogic_lib_dir`, o pubspec'e göre relative, kütüphane oradaysa 3. `<paket root>/third_party/openriglogic/lib` |
-| libc++ (Linux) | 1. `LUMINA_LIBCXX_DIR` 2. `libcxx_dir` user-define'ı 3. `<paket root>/../../lumina/flutter_filament/third_party/libcxx` |
+| Windows x64 | Doğrulandı (`flutter test`, `flutter build windows`) |
+| Linux x64 | Doğrulandı (`flutter test`, `flutter build linux`) |
+| Android arm64 | Build ve link oluyor (`flutter build apk`); libc++ static link edilir |
+| macOS, iOS | Xcode clang'ıyla derlenmesi beklenir; henüz doğrulanmadı |
+| Web | Desteklenmez (`dart:ffi`) |
 
-Kütüphaneyi barındırmayan bir `riglogic_lib_dir` paketin kendi build'ine bırakır; böylece bir uygulama prebuilt kütüphaneyi bağladığı klasörü adlandırabilir, bu paketin geliştirme checkout'u ise yerinde build edilmiş kütüphaneyi kullanmaya devam eder. `libriglogic.a` / `riglogic.lib` ikisinde de yoksa hook, build script'ini adıyla anan bir hatayla durur. Git dependency pub cache'te durur ve orada kütüphane build edilmemiştir; bu yüzden `riglogic_lib_dir`'i build script'ini çalıştırdığınız bir checkout'a yönlendirin:
+## Başlarken
 
-```yaml
-dependencies:
-  flutter_riglogic:
-    git:
-      url: https://github.com/LuminaGame/tools.git
-      path: flutter_riglogic
-
-hooks:
-  user_defines:
-    flutter_riglogic:
-      riglogic_lib_dir: ../tools/flutter_riglogic/third_party/openriglogic/lib
-      libcxx_dir: flutter_filament/third_party/libcxx   # yalnızca Linux
+```bash
+flutter pub add flutter_riglogic
 ```
+
+Gereksinimler: Dart 3.12 veya sonrası (native assets destekli Flutter) ve platformun C++ toolchain'i:
+
+- Windows: "Desktop development with C++" workload'u kurulu Visual Studio 2022 (ya da Build Tools).
+- Linux: `clang` (Flutter Linux desktop gereksinimlerinde zaten var).
+- Android: Flutter'ın Android toolchain'inin kurduğu Android NDK.
+- macOS / iOS: Xcode.
 
 ## Kullanım
 
 ```dart
 import 'package:flutter_riglogic/flutter_riglogic.dart';
 
-final reader = DnaReader.fromFile('assets/face.dna');
-print('${reader.name}: ${reader.jointCount} joint, '
-    '${reader.blendShapeChannelCount} blend shape, ${reader.rawControlCount} raw control');
+void evaluate(String dnaPath) {
+  final reader = DnaReader.fromFile(dnaPath);
+  print('${reader.name}: ${reader.jointCount} joints, '
+      '${reader.blendShapeChannelCount} blend shapes, '
+      '${reader.rawControlCount} raw controls');
 
-final rig = RigLogic.create(reader);
-final instance = RigInstance.create(rig)..lod = 0;
+  final rig = RigLogic.create(reader);
+  final instance = RigInstance.create(rig)..lod = 0;
 
-instance.setRawControl(0, 1.0);
-rig.calculate(instance);
+  instance.setRawControl(0, 1.0);
+  rig.calculate(instance);
 
-final joints = instance.getJointOutputs();          // List<double>
-final weights = instance.getBlendShapeOutputs();    // List<double>
-final maps = instance.getAnimatedMapOutputs();      // List<double>
+  final joints = instance.getJointOutputs(); // List<double>
+  final weights = instance.getBlendShapeOutputs(); // List<double>
+  final maps = instance.getAnimatedMapOutputs(); // List<double>
+  print('${joints.length} joint values, ${weights.length} weights, ${maps.length} maps');
 
-instance.dispose();
-rig.dispose();
-reader.dispose();
+  instance.dispose();
+  rig.dispose();
+  reader.dispose();
+}
 ```
 
-`DnaReader.fromMemory(bytes)` bellekteki bir DNA'yı okur. Native kütüphane yüklü değilse factory'ler `UnsupportedError` fırlatır.
+`DnaReader.fromMemory(bytes)` bellekteki bir DNA'yı okur (örneğin `rootBundle`'dan). Native kütüphane yüklenmemişse factory'ler `UnsupportedError` fırlatır. Her nesne native bellek tutar: işiniz bitince `dispose()` çağırın.
 
-`example/`, `assets/sample.dna` dosyasını yükleyip rig'in control'lerini süren bir Flutter uygulamasıdır. Paket klasöründe `dart run tool/inspect_dna.dart`, `test/fixtures/sample.dna` içindeki joint'leri, blend shape'leri ve control'leri yazdırır.
+[Example](https://github.com/LuminaGame/tools/tree/main/flutter_riglogic/example), küçük bir DNA yükleyip raw control'leri slider olarak listeleyen ve hesaplanan output'ları gösteren bir Flutter uygulamasıdır.
 
-## Test'ler
+## Native kütüphane nasıl derlenir
 
-```bash
-flutter test test/dna_reader_test.dart test/rig_logic_test.dart
-```
+`hook/build.dart`, `flutter_riglogic`'i dynamic library olarak derler ve code asset olarak paketler; Dart onu `@Native` binding'leriyle çağırır.
 
-Gerçek binary DNA fixture'ı `test/fixtures/sample.dna` üzerinde çalışırlar.
+- **Kaynaktan (varsayılan).** Hook C wrapper'ı (`src/riglogic_c.cpp`) paketle gelen OpenRigLogic kaynaklarıyla (`third_party/openriglogic/src`, yaklaşık 100 dosya) birlikte derler. İlk build yaklaşık 20 saniye sürer; sonraki build'ler cache'lenmiş kütüphaneyi kullanır.
+- **Prebuilt static library (isteğe bağlı).** `third_party/openriglogic/lib` (ya da `riglogic_lib_dir` user-define'ının gösterdiği klasör) `riglogic.lib` / `libriglogic.a` içeriyorsa yalnızca wrapper derlenir ve o kütüphane link edilir. `tool/build_openriglogic.{sh,bat}` ve `tool/build_openriglogic_android.{sh,bat}` onu CMake ile build eder. Uygulama user-define'ı kendi root pubspec'inde, o pubspec'e göreli olarak verir:
 
-## Lisans
+  ```yaml
+  hooks:
+    user_defines:
+      flutter_riglogic:
+        riglogic_lib_dir: third_party/openriglogic/lib
+        libcxx_dir: path/to/libcxx   # yalnızca Linux: prebuilt kütüphanenin build edildiği libc++
+  ```
 
-GPL-3.0 (bkz. [LICENSE](LICENSE)). `third_party/openriglogic/` altındaki vendored OpenRigLogic, Epic Games tarafından MIT lisansıyla yayınlanmıştır (bkz. [LICENSE](third_party/openriglogic/LICENSE)).
+## Ek bilgiler
+
+- Kaynak, issue'lar ve katkı: [LuminaGame/tools](https://github.com/LuminaGame/tools) ([issue'lar](https://github.com/LuminaGame/tools/issues)). Testler: `flutter test test/dna_reader_test.dart test/rig_logic_test.dart` (gerçek DNA fixture'ı `test/fixtures/sample.dna`'yı okurlar); `dart run tool/inspect_dna.dart` o fixture'ın joint, blend shape ve control'lerini yazdırır.
+- Lisans: GPL-3.0 ([LICENSE](LICENSE)). Paketle gelen OpenRigLogic, Epic Games tarafından MIT lisansıyla dağıtılır; bkz. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- Epic'in MetaHuman araçlarından gelen DNA dosyaları Epic'in kendi lisans koşullarına tabidir; bu paket yalnızca küçük, sentetik bir test DNA'sı içerir.

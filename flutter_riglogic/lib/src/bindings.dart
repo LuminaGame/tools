@@ -136,7 +136,14 @@ typedef RlRigInstanceGetOutputsC =
 typedef RlRigInstanceGetOutputsDart =
     int Function(Pointer<RlRigInstance> inst, Pointer<Pointer<Float>> outData);
 
+/// Low-level access to the native OpenRigLogic wrapper (`src/riglogic_c.h`).
+///
+/// The functions come from the code asset the package's native-assets hook
+/// builds (`@Native` bindings); hosts without native assets fall back to
+/// opening a prebuilt `flutter_riglogic` library by path. Most code uses
+/// `DnaReader`, `RigLogic` and `RigInstance` instead.
 class RigLogicBindings {
+  /// The process-wide bindings.
   static final RigLogicBindings instance = RigLogicBindings._init();
 
   bool _isAvailable = false;
@@ -174,6 +181,7 @@ class RigLogicBindings {
   late final RlRigInstanceGetOutputsDart rigInstanceGetBlendShapeOutputs;
   late final RlRigInstanceGetOutputsDart rigInstanceGetAnimatedMapOutputs;
 
+  /// Whether the native library was found and bound.
   bool get isAvailable => _isAvailable;
 
   RigLogicBindings._init() {
