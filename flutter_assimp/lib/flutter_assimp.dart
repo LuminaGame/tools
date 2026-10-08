@@ -214,8 +214,9 @@ class FlutterAssimp {
   };
 
   /// The lower-case file extensions (no dot) the loaded bridge imports: FBX
-  /// and OBJ, plus Collada, 3DS, PLY, DirectX and STL when the Filament
-  /// checkout the hook built from has their sources.
+  /// and OBJ, plus Collada, 3DS, PLY, DirectX and STL (always with the
+  /// bundled Assimp; with a Filament build, when its checkout has their
+  /// sources).
   static Set<String> get importExtensions => _importExtensions ??= () {
     final list = _bindings.getImportExtensions();
     if (list == null) return _builtInExtensions;

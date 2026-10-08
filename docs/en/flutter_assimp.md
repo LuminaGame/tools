@@ -8,11 +8,19 @@ Texture coordinates come out in glTF's convention (v = 0 at the top of the image
 
 **On this page:**
 
+- [Native build](#native-build)
 - [Native C bridge](#native-c-bridge)
   - [`src/assimp_bridge.h`](#srcassimp_bridgeh)
 - [Dart API](#dart-api)
   - [`lib/flutter_assimp.dart`](#libflutter_assimpdart)
   - [`lib/src/assimp_bindings.dart`](#libsrcassimp_bindingsdart)
+
+## Native build
+
+`hook/build.dart` compiles the bridge into the `flutter_assimp` dynamic library (code asset `package:flutter_assimp/src/third_party/assimp_c.g.dart`):
+
+- **Bundled sources** (default, and how the package builds from pub.dev): the Assimp 5.0 sources in `third_party/assimp` (Filament's patched copy; `third_party/assimp/sources.txt` lists the compiled files, `tool/vendor_assimp.dart <filament checkout>` refreshes them) go to the compiler in one run through a response file. All importers but FBX, OBJ, Collada, 3DS, PLY, DirectX and STL are disabled with `ASSIMP_BUILD_NO_*_IMPORTER`, so Assimp's importer registry registers those seven; `src/vendored/` compiles the glTF 2 exporter with the glTF headers visible. zlib is `third_party/zlib` on Windows and the system library elsewhere.
+- **Filament build** (Lumina): when `filament_dir` names a Filament build holding `out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib` (Windows) or `out/cmake-release/third_party/libassimp/tnt/libassimp.a`, the bridge links it, compiles the extra importers from that checkout and registers them itself (`FLUTTER_ASSIMP_EXTRA_IMPORTERS`).
 
 ## Native C bridge
 
@@ -41,9 +49,9 @@ High-performance native Assimp 3D asset conversion bridge for Dart & Flutter.
 | Method / Getter | Signature | Purpose & Description |
 | :--- | :--- | :--- |
 | `isAvailable` | `static bool get isAvailable` | Returns true if the native Assimp library is loaded and available. |
-| `version` | `static String get version` | Returns the underlying native Assimp library version (e.g. "6.0.5"). |
+| `version` | `static String get version` | Returns the underlying native Assimp library version (e.g. "5.0 (commit 4673545f)"). |
 | `lastError` | `static String get lastError` | Returns the last error message from native Assimp operations. |
-| `importExtensions` | `static Set<String> get importExtensions` | The lower-case extensions (no dot) the loaded bridge imports: FBX and OBJ (the importers Filament's Assimp build has), plus Collada (`dae`, `zae`), 3DS (`3ds`, `prj`), PLY, DirectX (`x`) and STL, which the hook compiles from the same Filament checkout when its `third_party/libassimp/code` holds their sources (an older prebuilt archive without them builds the bridge with FBX and OBJ only). Without the bridge: the formats the package is built to read. |
+| `importExtensions` | `static Set<String> get importExtensions` | The lower-case extensions (no dot) the loaded bridge imports: FBX, OBJ, Collada (`dae`, `zae`), 3DS (`3ds`, `prj`), PLY, DirectX (`x`) and STL, whether the hook built the bundled Assimp sources or linked a Filament build (an older Filament prebuilt without the extra importer sources builds the bridge with FBX and OBJ only). Without the bridge: the formats the package is built to read. |
 | `isSupportedFormat` | `static bool isSupportedFormat(String pathOrExtension)` | Whether [pathOrExtension] (a path, `.ext` or `ext`) is a 3D format the bridge imports ([importExtensions]). |
 
 ### `lib/src/assimp_bindings.dart`

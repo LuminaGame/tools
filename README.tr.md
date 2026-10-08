@@ -8,7 +8,7 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 
 | Paket | Ne işe yarar |
 |---|---|
-| [`flutter_assimp`](flutter_assimp/) | [Assimp](https://github.com/assimp/assimp) için Dart FFI binding'leri: FBX, OBJ, DAE, 3DS, Blend ve diğer formatları glTF 2.0 binary'ye (GLB) çevirir. Assimp kütüphanesini bir Filament build'inden link eder. |
+| [`flutter_assimp`](flutter_assimp/) | [Assimp](https://github.com/assimp/assimp) için Dart FFI binding'leri: FBX, OBJ, Collada, 3DS, PLY, DirectX ve STL'yi glTF 2.0 binary'ye (GLB) çevirir. Paketle gelen Assimp kaynaklarını derler ya da bir Filament build'inin Assimp kütüphanesini link eder. |
 | [`flutter_kimodo`](flutter_kimodo/) | [kimodo.cpp](https://github.com/localai-org/kimodo.cpp) için Dart FFI binding'leri: NVIDIA Kimodo ile metinden hareket üretimi (GGUF ağırlıklar, CPU ve Vulkan), arka plan isolate'inde. |
 | [`flutter_riglogic`](flutter_riglogic/) | Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi için Dart FFI binding'leri: MetaHuman `.dna` dosyalarını okur ve yüz rig'lerini hesaplar. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Sistemde kurulu GStreamer 1.x için saf Dart FFI binding'leri, run time'da yüklenir: pipeline'lar, PNG ya da RGBA frame'lerden VP8/WebM encode, media probe. Engine'in smoke test'leri videolarını bununla kaydeder. |
@@ -22,9 +22,9 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 - Dart `^3.12.0` içeren Flutter SDK.
 - Workspace script'leri için [melos](https://melos.invertase.dev/) 7 (root pubspec'te dev dependency; `dart pub global activate melos` ile `melos` PATH'e girer, ya da `dart run melos` kullanın).
 - Native paketler (`flutter_assimp`, `flutter_riglogic`) için:
-  - **Linux**: clang, CMake ve lumina repo'sunda `flutter_filament/third_party/libcxx` altında gelen bundled libc++.
-  - **Windows**: C++ workload'u kurulu Visual Studio 2022 (MSVC), CMake ve Ninja.
-  - `flutter_assimp` için prebuilt **Google Filament v1.77.0** (lumina repo'sunda anlatılan local patch'lerle).
+  - **Linux**: clang (ve zlib header'ları); lumina repo'sunda `flutter_filament/third_party/libcxx` altında gelen bundled libc++ varsa o kullanılır.
+  - **Windows**: C++ workload'u kurulu Visual Studio 2022 (MSVC); CMake ve Ninja yalnızca isteğe bağlı prebuilt OpenRigLogic kütüphanesi için.
+  - İsteğe bağlı: `flutter_assimp` için prebuilt **Google Filament** (lumina repo'sunda anlatılan local patch'lerle); yoksa hook paketle gelen Assimp kaynaklarını derler.
 - `flutter_gstreamer` için: base ve good plugin set'leriyle GStreamer 1.x.
 - Linux'ta `lumina_mouse_capture` için: GTK 3, Wayland desteği için de `wayland-client`, `wayland-scanner` ve `wayland-protocols`.
 
@@ -54,7 +54,7 @@ dart pub get                          # workspace'teki tüm paketleri resolve ed
 
 ### Filament
 
-`flutter_assimp`, küçük bir C++ bridge'i `filament/third_party/libassimp` içindeki Assimp kaynaklarına karşı derler ve Filament build'inin static kütüphanelerini link eder:
+Filament build'i yoksa `flutter_assimp`'in hook'u bridge'i `flutter_assimp/third_party/assimp` altında paketle gelen Assimp kaynaklarıyla derler (`flutter_assimp/tool/vendor_assimp.dart` onları yeniler); paket pub.dev'den böyle build olur. `filament_dir` Assimp kütüphanesi olan bir Filament build'ini gösterdiğinde hook bridge'i `filament/third_party/libassimp` içindeki Assimp kaynaklarına karşı derler ve Filament build'inin static kütüphanelerini link eder:
 
 - Linux / macOS: `filament/out/cmake-release/third_party/libassimp/tnt/libassimp.a` ve `.../zstd/tnt/libzstd.a`
 - Windows: `filament/out/cmake-release-windows/third_party/{libassimp,zstd,libz}/tnt/*.lib`
@@ -63,7 +63,7 @@ Filament'in nasıl build ve patch edileceği [lumina](https://github.com/LuminaG
 
 ### OpenRigLogic
 
-`flutter_riglogic`, `flutter_riglogic/third_party/openriglogic` altındaki vendored kaynaklardan build edilen static bir OpenRigLogic kütüphanesini link eder:
+`flutter_riglogic`'in hook'u `flutter_riglogic/third_party/openriglogic` altındaki vendored kaynakları kendisi derler. İsteğe bağlı olarak bu script'lerle build edilen static bir OpenRigLogic kütüphanesi onun yerine link edilir (daha hızlı yeniden build):
 
 ```bash
 bash flutter_riglogic/tool/build_openriglogic.sh              # Linux   -> third_party/openriglogic/lib/libriglogic.a

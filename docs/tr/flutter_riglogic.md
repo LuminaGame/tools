@@ -6,6 +6,7 @@
 
 **Bu sayfada:**
 
+- [Native build](#native-build)
 - [Native C köprüsü](#native-c-köprüsü)
   - [`src/riglogic_c.h`](#srcriglogic_ch)
 - [Dart API](#dart-api)
@@ -13,6 +14,13 @@
   - [`lib/src/dna_reader.dart`](#libsrcdna_readerdart)
   - [`lib/src/rig_instance.dart`](#libsrcrig_instancedart)
   - [`lib/src/rig_logic.dart`](#libsrcrig_logicdart)
+
+## Native build
+
+`hook/build.dart`, `src/riglogic_c.cpp`'yi `flutter_riglogic` dynamic library'sine derler (code asset `package:flutter_riglogic/src/riglogic_native.dart`; `lib/src/riglogic_native.dart` içindeki `@Native` fonksiyonlarla çağrılır; `RigLogicBindings` gerekirse kütüphaneyi yoluyla açmaya düşer):
+
+- **Kaynaktan** (varsayılan; paket pub.dev'den böyle build olur): vendored OpenRigLogic kaynakları (`third_party/openriglogic/src/**/*.cpp`) wrapper ile birlikte, bir response file üzerinden ve altı rotation order'ın hepsi açık olarak derlenir. Android'de libc++ static link edilir.
+- **Prebuilt static library**: `third_party/openriglogic/lib` ya da `riglogic_lib_dir` user-define'ı `riglogic.lib` / `libriglogic.a` içeriyorsa (`tool/build_openriglogic*` build eder) yalnızca wrapper derlenir ve kütüphane link edilir. O klasörü `lib/src/hook/riglogic_lib_dir.dart` çözer (pub.dev `hook/build.dart` dışında hook dosyası kabul etmez).
 
 ## Native C köprüsü
 

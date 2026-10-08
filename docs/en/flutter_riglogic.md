@@ -6,6 +6,7 @@
 
 **On this page:**
 
+- [Native build](#native-build)
 - [Native C bridge](#native-c-bridge)
   - [`src/riglogic_c.h`](#srcriglogic_ch)
 - [Dart API](#dart-api)
@@ -13,6 +14,13 @@
   - [`lib/src/dna_reader.dart`](#libsrcdna_readerdart)
   - [`lib/src/rig_instance.dart`](#libsrcrig_instancedart)
   - [`lib/src/rig_logic.dart`](#libsrcrig_logicdart)
+
+## Native build
+
+`hook/build.dart` compiles `src/riglogic_c.cpp` into the `flutter_riglogic` dynamic library (code asset `package:flutter_riglogic/src/riglogic_native.dart`, called through the `@Native` functions in `lib/src/riglogic_native.dart`; `RigLogicBindings` falls back to opening the library by path):
+
+- **From source** (default, and how the package builds from pub.dev): the vendored OpenRigLogic sources (`third_party/openriglogic/src/**/*.cpp`) are compiled with the wrapper, passed through a response file, with all six rotation orders enabled. On Android libc++ is linked statically.
+- **Prebuilt static library**: when `third_party/openriglogic/lib` or the `riglogic_lib_dir` user-define holds `riglogic.lib` / `libriglogic.a` (built by `tool/build_openriglogic*`), only the wrapper is compiled and the library linked. `lib/src/hook/riglogic_lib_dir.dart` resolves that folder (pub.dev accepts no hook files besides `hook/build.dart`).
 
 ## Native C bridge
 

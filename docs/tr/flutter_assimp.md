@@ -8,11 +8,19 @@ Doku koordinatları glTF kuralıyla çıkar (v = 0 görüntünün üstünde): FB
 
 **Bu sayfada:**
 
+- [Native build](#native-build)
 - [Native C köprüsü](#native-c-köprüsü)
   - [`src/assimp_bridge.h`](#srcassimp_bridgeh)
 - [Dart API](#dart-api)
   - [`lib/flutter_assimp.dart`](#libflutter_assimpdart)
   - [`lib/src/assimp_bindings.dart`](#libsrcassimp_bindingsdart)
+
+## Native build
+
+`hook/build.dart` bridge'i `flutter_assimp` dynamic library'sine derler (code asset `package:flutter_assimp/src/third_party/assimp_c.g.dart`):
+
+- **Paketle gelen kaynaklar** (varsayılan; paket pub.dev'den böyle build olur): `third_party/assimp` altındaki Assimp 5.0 kaynakları (Filament'in patch'li kopyası; derlenen dosyaları `third_party/assimp/sources.txt` listeler, `tool/vendor_assimp.dart <filament checkout>` onları yeniler) bir response file üzerinden tek derleyici çalıştırmasına verilir. FBX, OBJ, Collada, 3DS, PLY, DirectX ve STL dışındaki importer'lar `ASSIMP_BUILD_NO_*_IMPORTER` ile kapatılır, böylece Assimp'in importer registry'si bu yedisini kaydeder; `src/vendored/` glTF 2 exporter'ı glTF header'ları görünür şekilde derler. zlib Windows'ta `third_party/zlib`, diğer platformlarda sistem kütüphanesidir.
+- **Filament build'i** (Lumina): `filament_dir`, `out/cmake-release-windows/third_party/libassimp/tnt/assimp.lib` (Windows) ya da `out/cmake-release/third_party/libassimp/tnt/libassimp.a` içeren bir Filament build'ini gösterdiğinde bridge onu link eder, ek importer'ları o checkout'tan derler ve kendisi kaydeder (`FLUTTER_ASSIMP_EXTRA_IMPORTERS`).
 
 ## Native C köprüsü
 
@@ -41,9 +49,9 @@ High-performance native Assimp 3D asset conversion bridge for Dart & Flutter.
 | Metot / Getter | İmzası | Ne İşe Yarar? |
 | :--- | :--- | :--- |
 | `isAvailable` | `static bool get isAvailable` | Returns true if the native Assimp library is loaded and available. |
-| `version` | `static String get version` | Returns the underlying native Assimp library version (e.g. "6.0.5"). |
+| `version` | `static String get version` | Returns the underlying native Assimp library version (e.g. "5.0 (commit 4673545f)"). |
 | `lastError` | `static String get lastError` | Returns the last error message from native Assimp operations. |
-| `importExtensions` | `static Set<String> get importExtensions` | Yüklü bridge'in import ettiği küçük harfli uzantılar (noktasız): FBX ve OBJ (Filament'in Assimp build'inde olan importer'lar), artı Collada (`dae`, `zae`), 3DS (`3ds`, `prj`), PLY, DirectX (`x`) ve STL; bunları hook, `third_party/libassimp/code` klasöründe kaynakları varsa aynı Filament checkout'undan derler (bunları içermeyen eski bir prebuilt arşiv bridge'i yalnız FBX ve OBJ ile derler). Bridge yoksa: paketin okumak üzere derlendiği formatlar. |
+| `importExtensions` | `static Set<String> get importExtensions` | Yüklü bridge'in import ettiği küçük harfli uzantılar (noktasız): FBX, OBJ, Collada (`dae`, `zae`), 3DS (`3ds`, `prj`), PLY, DirectX (`x`) ve STL; hook ister paketle gelen Assimp kaynaklarını derlesin ister bir Filament build'ini link etsin (ek importer kaynaklarını içermeyen eski bir Filament prebuilt'i bridge'i yalnız FBX ve OBJ ile derler). Bridge yoksa: paketin okumak üzere derlendiği formatlar. |
 | `isSupportedFormat` | `static bool isSupportedFormat(String pathOrExtension)` | [pathOrExtension] (bir yol, `.ext` ya da `ext`) bridge'in import ettiği bir 3D formatı mı ([importExtensions]). |
 
 ### `lib/src/assimp_bindings.dart`

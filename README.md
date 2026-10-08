@@ -8,7 +8,7 @@ Documentation: [docs/README.md](docs/README.md).
 
 | Package | What it is |
 |---|---|
-| [`flutter_assimp`](flutter_assimp/) | Dart FFI bindings to [Assimp](https://github.com/assimp/assimp): converts FBX, OBJ, DAE, 3DS, Blend and other formats to glTF 2.0 binary (GLB). Links the Assimp library from a Filament build. |
+| [`flutter_assimp`](flutter_assimp/) | Dart FFI bindings to [Assimp](https://github.com/assimp/assimp): converts FBX, OBJ, Collada, 3DS, PLY, DirectX and STL to glTF 2.0 binary (GLB). Builds the bundled Assimp sources, or links the Assimp library of a Filament build. |
 | [`flutter_kimodo`](flutter_kimodo/) | Dart FFI bindings to [kimodo.cpp](https://github.com/localai-org/kimodo.cpp): NVIDIA Kimodo text-to-motion generation (GGUF weights, CPU and Vulkan) on a background isolate. |
 | [`flutter_riglogic`](flutter_riglogic/) | Dart FFI bindings to Epic Games' [OpenRigLogic](https://github.com/EpicGames/openriglogic): reads MetaHuman `.dna` files and evaluates facial rigs. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Pure-Dart FFI bindings to a system GStreamer 1.x install, loaded at run time: pipelines, VP8/WebM encoding from PNG or RGBA frames, media probing. The engine's smoke tests record their videos with it. |
@@ -22,9 +22,9 @@ Related repositories: [lumina](https://github.com/LuminaGame/lumina) (engine and
 - Flutter SDK with Dart `^3.12.0`.
 - [melos](https://melos.invertase.dev/) 7 for the workspace scripts (a dev dependency of the root pubspec; `dart pub global activate melos` puts `melos` on the PATH, or use `dart run melos`).
 - For the native packages (`flutter_assimp`, `flutter_riglogic`):
-  - **Linux**: clang, CMake, and the bundled libc++ that ships in the lumina repo under `flutter_filament/third_party/libcxx`.
-  - **Windows**: Visual Studio 2022 with the C++ workload (MSVC), CMake and Ninja.
-  - A prebuilt **Google Filament v1.77.0** (with the local patches documented in the lumina repo) for `flutter_assimp`.
+  - **Linux**: clang (and zlib headers); the bundled libc++ that ships in the lumina repo under `flutter_filament/third_party/libcxx` is used when present.
+  - **Windows**: Visual Studio 2022 with the C++ workload (MSVC); CMake and Ninja only for the optional prebuilt OpenRigLogic library.
+  - Optional: a prebuilt **Google Filament** (with the local patches documented in the lumina repo) for `flutter_assimp`; without one the hook compiles the bundled Assimp sources.
 - For `flutter_gstreamer`: GStreamer 1.x with the base and good plugin sets.
 - For `lumina_mouse_capture` on Linux: GTK 3 and, for Wayland support, `wayland-client`, `wayland-scanner` and `wayland-protocols`.
 
@@ -54,7 +54,7 @@ dart pub get                          # resolves every package of the workspace
 
 ### Filament
 
-`flutter_assimp` compiles a small C++ bridge against the Assimp sources in `filament/third_party/libassimp` and links the static libraries of the Filament build:
+Without a Filament build, `flutter_assimp`'s hook compiles its bridge with the Assimp sources bundled in `flutter_assimp/third_party/assimp` (refreshed by `flutter_assimp/tool/vendor_assimp.dart`); that is how the package builds from pub.dev. When `filament_dir` names a Filament build with its Assimp library, the hook compiles the bridge against the Assimp sources in `filament/third_party/libassimp` and links the static libraries of the Filament build:
 
 - Linux / macOS: `filament/out/cmake-release/third_party/libassimp/tnt/libassimp.a` and `.../zstd/tnt/libzstd.a`
 - Windows: `filament/out/cmake-release-windows/third_party/{libassimp,zstd,libz}/tnt/*.lib`
@@ -63,7 +63,7 @@ How to build and patch Filament is documented in the [lumina](https://github.com
 
 ### OpenRigLogic
 
-`flutter_riglogic` links a static OpenRigLogic library built from the vendored sources in `flutter_riglogic/third_party/openriglogic`:
+`flutter_riglogic`'s hook compiles the vendored sources in `flutter_riglogic/third_party/openriglogic` itself. Optionally, a static OpenRigLogic library built with these scripts is linked instead (faster rebuilds):
 
 ```bash
 bash flutter_riglogic/tool/build_openriglogic.sh              # Linux   -> third_party/openriglogic/lib/libriglogic.a
