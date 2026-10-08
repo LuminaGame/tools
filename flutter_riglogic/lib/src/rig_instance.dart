@@ -30,9 +30,11 @@ class RigInstance {
     return RigInstance._(handle);
   }
 
-  int get rawControlCount => RigLogicBindings.instance.rigInstanceGetRawControlCount(handle);
+  int get rawControlCount =>
+      RigLogicBindings.instance.rigInstanceGetRawControlCount(handle);
 
-  double getRawControl(int index) => RigLogicBindings.instance.rigInstanceGetRawControl(handle, index);
+  double getRawControl(int index) =>
+      RigLogicBindings.instance.rigInstanceGetRawControl(handle, index);
 
   void setRawControl(int index, double value) {
     RigLogicBindings.instance.rigInstanceSetRawControl(handle, index, value);
@@ -40,7 +42,8 @@ class RigInstance {
 
   int get lod => RigLogicBindings.instance.rigInstanceGetLod(handle);
 
-  set lod(int value) => RigLogicBindings.instance.rigInstanceSetLod(handle, value);
+  set lod(int value) =>
+      RigLogicBindings.instance.rigInstanceSetLod(handle, value);
 
   List<double> getJointOutputs() {
     final bindings = RigLogicBindings.instance;
@@ -106,4 +109,3 @@ class RigInstance {
     }
   }
 }
-

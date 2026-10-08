@@ -9,14 +9,26 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 
 import 'riglogic_lib_dir.dart';
 
+/// Builds `flutter_riglogic` (the C wrapper in `src/riglogic_c.cpp`) as a
+/// dynamic library.
+///
+/// Two ways to get OpenRigLogic into it:
+///
+/// * **Prebuilt static library** (fast path): when the folder found by
+///   [resolveRiglogicLibDir] holds `riglogic.lib` / `libriglogic.a` (built by
+///   `tool/build_openriglogic.*`, or named by the `riglogic_lib_dir`
+///   user-define), only the wrapper is compiled and the library is linked.
+/// * **From source** (default for a package from pub.dev): otherwise the
+///   vendored OpenRigLogic sources in `third_party/openriglogic/src` are
+///   compiled together with the wrapper. No CMake and no setup; only the
+///   platform's C++ compiler (Visual Studio on Windows, clang/gcc on Linux,
+///   Xcode on macOS/iOS, the NDK on Android).
 void main(List<String> args) async {
   await build(args, (input, output) async {
     if (!input.config.buildCodeAssets) return;
 
-    final packageName = input.packageName;
     final targetOS = input.config.code.targetOS;
     final targetArch = input.config.code.targetArchitecture;
-    final libcxx = _libcxxDir(input);
     final staticLib = targetOS == OS.windows ? 'riglogic.lib' : 'libriglogic.a';
     final androidAbi = targetOS == OS.android ? _androidAbi(targetArch) : null;
     final riglogicLib = _riglogicLibDir(
@@ -24,84 +36,108 @@ void main(List<String> args) async {
       staticLib,
       androidAbi: androidAbi,
     );
-
-    final String staticLibPath;
-    if (targetOS == OS.android) {
-      if (File('$riglogicLib/android/$androidAbi/$staticLib').existsSync()) {
-        staticLibPath = '$riglogicLib/android/$androidAbi/$staticLib';
-      } else if (File('$riglogicLib/$androidAbi/$staticLib').existsSync()) {
-        staticLibPath = '$riglogicLib/$androidAbi/$staticLib';
-      } else if (File('$riglogicLib/$staticLib').existsSync()) {
-        staticLibPath = '$riglogicLib/$staticLib';
-      } else {
-        staticLibPath = '$riglogicLib/android/$androidAbi/$staticLib';
-      }
-    } else {
-      staticLibPath = '$riglogicLib/$staticLib';
-    }
-
-    if (!File(staticLibPath).existsSync()) {
-      final scriptName = targetOS == OS.windows
-          ? 'build_openriglogic.bat'
-          : (targetOS == OS.android
-                ? 'build_openriglogic_android.bat'
-                : 'build_openriglogic.sh');
+    final prebuilt = _prebuiltLibrary(riglogicLib, staticLib, androidAbi);
+    // Linux only: the bundled libc++ of a Lumina checkout, when there is one.
+    final libcxx = targetOS == OS.linux ? _bundledLibcxx(input) : null;
+    if (prebuilt != null && targetOS == OS.linux && libcxx == null) {
       throw StateError(
-        'OpenRigLogic is not built: $staticLibPath is missing. '
-        'Run tool/$scriptName in flutter_riglogic, '
-        'or point LUMINA_RIGLOGIC_LIB_DIR / the riglogic_lib_dir user-define at a built one.',
+        'The prebuilt $prebuilt was built against the bundled libc++, which '
+        'is missing. Set the libcxx_dir user-define, or remove the prebuilt '
+        'library so the hook compiles OpenRigLogic from source.',
       );
     }
+
+    // The vendored sources go to the compiler through a response file: their
+    // absolute paths overflow the Windows command line (cl.exe runs through
+    // cmd.exe with the Visual Studio environment script).
+    String? sourcesResponseFile;
+    if (prebuilt == null) {
+      final root = Directory.fromUri(
+        input.packageRoot.resolve('third_party/openriglogic/src/'),
+      );
+      final vendored =
+          root
+              .listSync(recursive: true)
+              .whereType<File>()
+              .where((f) => f.path.endsWith('.cpp'))
+              .toList()
+            ..sort((a, b) => a.path.compareTo(b.path));
+      if (vendored.isEmpty) {
+        throw StateError('OpenRigLogic sources are missing under ${root.path}.');
+      }
+      final rsp = File.fromUri(
+        input.outputDirectory.resolve('openriglogic_sources.rsp'),
+      );
+      rsp.writeAsStringSync(
+        vendored.map((f) => '"${_slash(f.absolute.path)}"').join('\n'),
+      );
+      sourcesResponseFile = _slash(rsp.path);
+      output.dependencies.addAll(vendored.map((f) => f.absolute.uri));
+    }
+
+    // Language.cpp makes native_toolchain_c link the platform's C++ standard
+    // library, but it also passes `-x c++`, which would read the static
+    // libraries in [flags] as sources. So it is used only when nothing is
+    // linked by path: a source build without the bundled libc++.
+    final cppLanguage = prebuilt == null && libcxx == null;
     final cbuilder = CBuilder.library(
-      name: packageName,
-      assetName: 'src/riglogic_bindings_generated.dart',
-      sources: ['src/riglogic_c.cpp'],
-      includes: ['src', 'third_party/openriglogic/include'],
-      flags: [
-        if (targetOS == OS.windows)
+      name: input.packageName,
+      language: cppLanguage ? Language.cpp : Language.c,
+      assetName: 'src/riglogic_native.dart',
+      sources: const ['src/riglogic_c.cpp'],
+      includes: [
+        'src',
+        'third_party/openriglogic/include',
+        if (prebuilt == null) 'third_party/openriglogic/src',
+      ],
+      defines: {
         // RIGLOGIC_EXPORTS: riglogic_c.h dllexports (not dllimports) the C API.
-        ...[
+        'RIGLOGIC_EXPORTS': null,
+        if (prebuilt == null)
+          for (final order in _rotationOrders)
+            'RL_BUILD_WITH_${order}_ROTATION_ORDER': null,
+      },
+      flags: [
+        if (targetOS == OS.windows) ...[
           '/std:c++17',
           '/EHsc',
           '/utf-8',
           '/W0',
           '/MT',
           '/DNOMINMAX',
-          '/DRIGLOGIC_EXPORTS',
-        ] else
+          // Compile the sources in parallel (one cl.exe invocation).
+          if (prebuilt == null) '/MP',
+        ] else ...[
           '-std=c++17',
-        if (targetOS == OS.linux) ...[
+          if (prebuilt == null) '-w',
+        ],
+        if (libcxx != null) ...[
           '-nostdinc++',
           '-isystem',
           '$libcxx/usr/lib/llvm-21/include/c++/v1',
           '-isystem',
           '$libcxx/usr/lib/llvm-21/include',
-          '-Wl,--whole-archive',
-          '$riglogicLib/libriglogic.a',
-          '-Wl,--no-whole-archive',
+        ],
+        if (sourcesResponseFile != null) '@$sourcesResponseFile',
+        if (prebuilt != null) ..._prebuiltLinkFlags(targetOS, prebuilt),
+        if (libcxx != null) ...[
           '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++.a',
           '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++abi.a',
-          '-ldl',
-          '-lpthread',
-        ] else if (targetOS == OS.macOS) ...[
-          '$riglogicLib/libriglogic.a',
+        ],
+        if (!cppLanguage && (targetOS == OS.macOS || targetOS == OS.iOS)) ...[
           '-lc++',
           '-lc++abi',
-        ] else if (targetOS == OS.windows) ...[
-          // Built by tool/build_openriglogic.bat. Absolute, because cl.exe
-          // runs in the hook's output directory.
-          '$riglogicLib/riglogic.lib',
-        ] else if (targetOS == OS.android) ...[
-          '-fPIC',
-          '-Wl,--whole-archive',
-          staticLibPath,
-          '-Wl,--no-whole-archive',
-          '-llog',
         ],
+        if (!cppLanguage && targetOS == OS.android) '-lc++_shared',
+        if (targetOS == OS.linux) ...['-ldl', '-lpthread'],
+        if (targetOS == OS.android) '-llog',
       ],
-      cppLinkStdLib: targetOS == OS.macOS
-          ? 'c++'
-          : (targetOS == OS.android ? 'c++_shared' : null),
+      // A source build links libc++ statically on Android, so the app needs
+      // no libc++_shared.so; elsewhere the platform default applies (MSVC's
+      // CRT, libstdc++ on Linux, libc++ on Apple platforms).
+      cppLinkStdLib: cppLanguage && targetOS == OS.android
+          ? 'c++_static'
+          : null,
     );
     await cbuilder.run(
       input: input,
@@ -112,6 +148,33 @@ void main(List<String> args) async {
     );
   });
 }
+
+/// The rotation orders OpenRigLogic's CMake build enables by default.
+const _rotationOrders = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'];
+
+/// The prebuilt OpenRigLogic static library under [libDir], or null when there
+/// is none (the hook then compiles the vendored sources).
+String? _prebuiltLibrary(String libDir, String staticLib, String? androidAbi) {
+  final candidates = androidAbi == null
+      ? ['$libDir/$staticLib']
+      : [
+          '$libDir/android/$androidAbi/$staticLib',
+          '$libDir/$androidAbi/$staticLib',
+          '$libDir/$staticLib',
+        ];
+  for (final path in candidates) {
+    if (File(path).existsSync()) return path;
+  }
+  return null;
+}
+
+List<String> _prebuiltLinkFlags(OS targetOS, String library) =>
+    switch (targetOS) {
+      OS.linux ||
+      OS.android => ['-Wl,--whole-archive', library, '-Wl,--no-whole-archive'],
+      // Absolute, because cl.exe runs in the hook's output directory.
+      _ => [library],
+    };
 
 String _androidAbi(Architecture architecture) {
   switch (architecture) {
@@ -147,8 +210,10 @@ String _riglogicLibDir(
 
 /// The bundled libc++ Linux links against (flutter_filament's
 /// `third_party/libcxx`): `LUMINA_LIBCXX_DIR`, else the `libcxx_dir`
-/// user-define, else the lumina repo checked out beside this one.
-String _libcxxDir(BuildInput input) {
+/// user-define, else the lumina repo checked out beside this one. Null when
+/// that folder has no libc++ headers (a package from pub.dev): the build then
+/// uses the compiler's own C++ standard library.
+String? _bundledLibcxx(BuildInput input) {
   final env = Platform.environment['LUMINA_LIBCXX_DIR'];
   final uri = env != null && env.isNotEmpty
       ? Uri.directory(env)
@@ -156,15 +221,21 @@ String _libcxxDir(BuildInput input) {
             input.packageRoot.resolve(
               '../../lumina/flutter_filament/third_party/libcxx/',
             );
-  return _dir(uri);
+  final dir = riglogicDirPath(uri);
+  return Directory('$dir/usr/lib/llvm-21/include/c++/v1').existsSync()
+      ? dir
+      : null;
 }
 
-String _dir(Uri uri) => riglogicDirPath(uri);
+String _slash(String path) => path.replaceAll(r'\', '/');
 
 /// The folder of the bundled libc++'s static libraries for the Linux target
 /// architecture: `x86_64-linux-gnu` or `aarch64-linux-gnu`.
-String _linuxTriplet(BuildInput input) => switch (input.config.code.targetArchitecture) {
+String _linuxTriplet(BuildInput input) =>
+    switch (input.config.code.targetArchitecture) {
       Architecture.x64 => 'x86_64-linux-gnu',
       Architecture.arm64 => 'aarch64-linux-gnu',
-      final other => throw UnsupportedError('Unsupported Linux architecture: $other'),
+      final other => throw UnsupportedError(
+        'Unsupported Linux architecture: $other',
+      ),
     };

@@ -1,11 +1,24 @@
 name: flutter_riglogic
-description: "Dart FFI bindings for Epic Games OpenRigLogic and DNA reader. Real-time MetaHuman facial rig evaluation."
+description: "Dart FFI bindings for Epic Games' OpenRigLogic: read MetaHuman DNA files and evaluate facial rigs (joints, blend shapes, animated maps) in real time."
 version: 0.0.1
-repository: https://github.com/LuminaGame/tools
+repository: https://github.com/LuminaGame/tools/tree/main/flutter_riglogic
+issue_tracker: https://github.com/LuminaGame/tools/issues
+topics:
+  - ffi
+  - riglogic
+  - metahuman
+  - facial-animation
+  - game-dev
+
+# The native-assets hook compiles the vendored OpenRigLogic sources with the
+# platform's C++ toolchain; these are the platforms that build is verified on.
+platforms:
+  android:
+  linux:
+  windows:
 
 environment:
   sdk: ^3.12.0
-  flutter: ">=3.0.0"
 resolution: workspace
 
 dependencies:
@@ -16,16 +29,6 @@ dependencies:
   hooks: ^1.0.0
   logging: ^1.3.0
   native_toolchain_c: ^0.17.4
-
-flutter:
-  plugin:
-    platforms:
-      linux:
-        ffiPlugin: true
-      macos:
-        ffiPlugin: true
-      # Windows and Android need no plugin entry: the native-assets hook builds and
-      # bundles flutter_riglogic.{dll,so}, and there is no windows/ or android/ plugin folder.
 
 dev_dependencies:
   ffigen: ^20.1.1

@@ -61,53 +61,69 @@ class DnaReader {
     }
   }
 
-  String get name => RigLogicBindings.instance.dnaReaderGetName(handle).toDartString();
+  String get name =>
+      RigLogicBindings.instance.dnaReaderGetName(handle).toDartString();
 
   int get lodCount => RigLogicBindings.instance.dnaReaderGetLodCount(handle);
 
-  int get jointCount => RigLogicBindings.instance.dnaReaderGetJointCount(handle);
+  int get jointCount =>
+      RigLogicBindings.instance.dnaReaderGetJointCount(handle);
 
   String getJointName(int index) {
     if (index < 0 || index >= jointCount) {
       throw RangeError.range(index, 0, jointCount - 1, 'index');
     }
-    return RigLogicBindings.instance.dnaReaderGetJointName(handle, index).toDartString();
+    return RigLogicBindings.instance
+        .dnaReaderGetJointName(handle, index)
+        .toDartString();
   }
 
-  int get blendShapeChannelCount => RigLogicBindings.instance.dnaReaderGetBlendShapeChannelCount(handle);
+  int get blendShapeChannelCount =>
+      RigLogicBindings.instance.dnaReaderGetBlendShapeChannelCount(handle);
 
   String getBlendShapeChannelName(int index) {
     if (index < 0 || index >= blendShapeChannelCount) {
       throw RangeError.range(index, 0, blendShapeChannelCount - 1, 'index');
     }
-    return RigLogicBindings.instance.dnaReaderGetBlendShapeChannelName(handle, index).toDartString();
+    return RigLogicBindings.instance
+        .dnaReaderGetBlendShapeChannelName(handle, index)
+        .toDartString();
   }
 
-  int get rawControlCount => RigLogicBindings.instance.dnaReaderGetRawControlCount(handle);
+  int get rawControlCount =>
+      RigLogicBindings.instance.dnaReaderGetRawControlCount(handle);
 
   String getRawControlName(int index) {
     if (index < 0 || index >= rawControlCount) {
       throw RangeError.range(index, 0, rawControlCount - 1, 'index');
     }
-    return RigLogicBindings.instance.dnaReaderGetRawControlName(handle, index).toDartString();
+    return RigLogicBindings.instance
+        .dnaReaderGetRawControlName(handle, index)
+        .toDartString();
   }
 
-  int get guiControlCount => RigLogicBindings.instance.dnaReaderGetGuiControlCount(handle);
+  int get guiControlCount =>
+      RigLogicBindings.instance.dnaReaderGetGuiControlCount(handle);
 
   String getGuiControlName(int index) {
     if (index < 0 || index >= guiControlCount) {
       throw RangeError.range(index, 0, guiControlCount - 1, 'index');
     }
-    return RigLogicBindings.instance.dnaReaderGetGuiControlName(handle, index).toDartString();
+    return RigLogicBindings.instance
+        .dnaReaderGetGuiControlName(handle, index)
+        .toDartString();
   }
 
-  int get animatedMapCount => RigLogicBindings.instance.dnaReaderGetAnimatedMapCount(handle);
+  int get animatedMapCount =>
+      RigLogicBindings.instance.dnaReaderGetAnimatedMapCount(handle);
 
   String getAnimatedMapName(int index) {
     if (index < 0 || index >= animatedMapCount) {
       throw RangeError.range(index, 0, animatedMapCount - 1, 'index');
     }
-    return RigLogicBindings.instance.dnaReaderGetAnimatedMapName(handle, index).toDartString();
+    return RigLogicBindings.instance
+        .dnaReaderGetAnimatedMapName(handle, index)
+        .toDartString();
   }
 
   void dispose() {
@@ -117,4 +133,3 @@ class DnaReader {
     }
   }
 }
-
