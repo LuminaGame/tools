@@ -17,3 +17,6 @@ pubspec_overrides.yaml
 *.obj
 *.pdb
 *.exp
+
+# dart doc output
+doc/api/

@@ -19,3 +19,6 @@ pubspec_overrides.yaml
 third_party/openriglogic/build/
 third_party/openriglogic/build-*/
 third_party/openriglogic/lib/
+
+# dart doc output
+doc/api/
