@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../hook/riglogic_lib_dir.dart';
+import 'package:flutter_riglogic/src/hook/riglogic_lib_dir.dart';
 
 /// Where the native-assets hook looks for the built OpenRigLogic library,
 /// against real folders in the system temp directory.

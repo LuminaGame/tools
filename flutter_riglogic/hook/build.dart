@@ -7,7 +7,7 @@ import 'package:hooks/hooks.dart';
 import 'package:logging/logging.dart';
 import 'package:native_toolchain_c/native_toolchain_c.dart';
 
-import 'riglogic_lib_dir.dart';
+import 'package:flutter_riglogic/src/hook/riglogic_lib_dir.dart';
 
 /// Builds `flutter_riglogic` (the C wrapper in `src/riglogic_c.cpp`) as a
 /// dynamic library.
