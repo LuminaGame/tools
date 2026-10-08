@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter_assimp/src/assimp_bindings.dart';
 
@@ -35,6 +36,7 @@ class AssimpImportConversion {
 /// High-performance native Assimp 3D asset conversion bridge for Dart & Flutter.
 class FlutterAssimp {
   static final AssimpBindings _bindings = AssimpBindings.instance;
+  static final math.Random _scratchRandom = math.Random.secure();
 
   /// Returns true if the native Assimp library is loaded and available.
   static bool get isAvailable => _bindings.isAvailable;
@@ -101,7 +103,10 @@ class FlutterAssimp {
       );
     }
     final dir = scratchDir ?? Directory.systemTemp;
-    final out = File('${dir.path}/assimp_import_${DateTime.now().microsecondsSinceEpoch}_$pid.glb');
+    // Unique per call, also between isolates of one process converting at
+    // the same microsecond (the time and the process id alone collide).
+    final out = File('${dir.path}/assimp_import_${DateTime.now().microsecondsSinceEpoch}_${pid}_'
+        '${_scratchRandom.nextInt(0x7fffffff).toRadixString(36)}.glb');
     try {
       // No await between the conversion and the report read: the report is
       // thread-local on the native side.

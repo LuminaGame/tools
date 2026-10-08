@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -94,6 +95,26 @@ void main() {
   });
 
   group('convertFileForImport on real Unreal FBX exports', () {
+    test('isolates converting at the same time each get their own scratch file', () async {
+      final fbx = _asset('Animations/AS_Poker_Dealer_Idle_01.FBX');
+      if (!fbx.existsSync()) {
+        markTestSkipped('test-assets FBX missing: ${fbx.path}');
+        return;
+      }
+      final path = fbx.path;
+      final results = await Future.wait([
+        for (var i = 0; i < 8; i++)
+          Isolate.run(() {
+            final r = FlutterAssimp.convertFileForImport(path);
+            return (r.success, r.error, r.glb?.length ?? 0);
+          }),
+      ]);
+      for (final (ok, error, bytes) in results) {
+        expect(ok, isTrue, reason: error);
+        expect(bytes, greaterThan(0));
+      }
+    });
+
     test('SM_Casino_Chair: cm/Z-up baked into a 1.0 m tall, upright glTF; UCX hull removed and reported', () {
       final fbx = _asset('StaticMeshes/SM_Casino_Chair.FBX');
       if (!haveAssets || !fbx.existsSync()) return markTestSkipped('test-assets/FBX missing');
