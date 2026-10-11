@@ -12,7 +12,9 @@ isolate.
 - The native-assets hook builds the loader wrapper (`src/flutter_kimodo.c`) and bundles the kimodo and ggml libraries
   beside it.
 - `KimodoModel.load(...)`, `generate(prompt, frames: …)`, `generateSequence([...])` → `KimodoMotion` (local XYZW
-  rotations per joint and frame, root positions).
+  rotations per joint and frame, root positions); `constraints: KimodoConstraints([...])` steers them with root
+  paths, end-effector targets and full-body keyframes (NVIDIA Kimodo's constraint sets, checked against the Python
+  reference).
 
 Model weights are not included: they are downloaded separately under their own licences. Documentation:
 [docs/en/flutter_kimodo.md](../docs/en/flutter_kimodo.md).

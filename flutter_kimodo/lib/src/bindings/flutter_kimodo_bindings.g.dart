@@ -164,21 +164,27 @@ external ffi.Pointer<kimodo_motion> flutter_kimodo_generate(
 @ffi.Native<
   ffi.Pointer<kimodo_motion> Function(
     ffi.Pointer<kimodo_model>,
-    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Pointer<ffi.Char>>,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Uint32,
     ffi.Uint32,
     ffi.Pointer<ffi.Float>,
     ffi.Pointer<ffi.Float>,
+    ffi.Uint64,
     ffi.Pointer<kimodo_generation_options>,
     ffi.Pointer<ffi.Char>,
     ffi.Int32,
   )
 >()
-external ffi.Pointer<kimodo_motion> flutter_kimodo_generate_conditioned(
+external ffi.Pointer<kimodo_motion> flutter_kimodo_generate_constrained(
   ffi.Pointer<kimodo_model> model,
-  ffi.Pointer<ffi.Char> prompt,
-  int frames,
+  ffi.Pointer<ffi.Pointer<ffi.Char>> prompts,
+  ffi.Pointer<ffi.Uint32> frames,
+  int count,
+  int transition_frames,
   ffi.Pointer<ffi.Float> observed_motion,
   ffi.Pointer<ffi.Float> motion_mask,
+  int values,
   ffi.Pointer<kimodo_generation_options> options,
   ffi.Pointer<ffi.Char> err,
   int err_len,

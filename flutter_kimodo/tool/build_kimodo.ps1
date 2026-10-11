@@ -3,7 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -File tool\build_kimodo.ps1 [-Vulkan auto|on|off] [-WorkDir <dir>] [-Clean]
 #
 # 1. checks out the pinned kimodo.cpp commit (tool\kimodo\UPSTREAM) and its
-#    ggml submodule into <WorkDir>\src,
+#    ggml submodule into <WorkDir>\src and applies tool\kimodo\patches\,
 # 2. configures and builds it through tool\kimodo\CMakeLists.txt, which
 #    compiles flutter_kimodo's C entry points (native\kimodo_lumina.cpp) into
 #    the kimodo library, with CMake + Ninja under the Visual Studio 2022 x64
@@ -99,6 +99,17 @@ if ($head -ne $Upstream.commit) {
   Log "fetching $($Upstream.commit)"
   Invoke-Native git @('-C', $Src, 'fetch', '-q', '--depth', '1', 'origin', $Upstream.commit)
   Invoke-Native git @('-C', $Src, 'checkout', '-q', '--force', $Upstream.commit)
+}
+# flutter_kimodo's changes to kimodo.cpp (tool\kimodo\patches\*.patch, in
+# order) on a clean LF checkout; a checkout that already has them is kept.
+$patches = @(Get-ChildItem -Path (Join-Path $PSScriptRoot 'kimodo\patches') -Filter '*.patch' -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object FullName)
+if ($patches.Count -gt 0) {
+  & git -C $Src apply --check --reverse @patches 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Log "applying $($patches.Count) patch(es)"
+    Invoke-Native git @('-C', $Src, '-c', 'core.autocrlf=false', 'checkout', '-q', '--force', $Upstream.commit)
+    Invoke-Native git (@('-C', $Src, '-c', 'core.autocrlf=false', 'apply') + $patches)
+  }
 }
 Invoke-Native git @('-C', $Src, 'submodule', 'update', '--init', '--depth', '1', '-q')
 $ggmlCommit = (git -C (Join-Path $Src 'ggml') rev-parse HEAD).Trim()

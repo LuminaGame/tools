@@ -12,7 +12,9 @@ isolate'inde üretilir.
 - Native-assets hook'u yükleyici wrapper'ı (`src/flutter_kimodo.c`) build eder ve kimodo ile ggml kütüphanelerini
   yanına paketler.
 - `KimodoModel.load(...)`, `generate(prompt, frames: …)`, `generateSequence([...])` → `KimodoMotion` (eklem ve kare
-  başına yerel XYZW rotasyonlar, kök konumları).
+  başına yerel XYZW rotasyonlar, kök konumları); `constraints: KimodoConstraints([...])` onları kök yolları, uç
+  efektör hedefleri ve tüm vücut anahtar kareleriyle yönlendirir (NVIDIA Kimodo'nun kısıt setleri, Python referansıyla
+  doğrulanmış).
 
 Model ağırlıkları dahil değildir: kendi lisanslarıyla ayrıca indirilir. Dokümantasyon:
 [docs/tr/flutter_kimodo.md](../docs/tr/flutter_kimodo.md).

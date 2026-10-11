@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import 'package:flutter_kimodo/src/bindings/flutter_kimodo_bindings.g.dart' as b;
+import 'package:flutter_kimodo/src/kimodo_constraints.dart';
 import 'package:flutter_kimodo/src/kimodo_exception.dart';
 import 'package:flutter_kimodo/src/kimodo_motion.dart';
 import 'package:flutter_kimodo/src/kimodo_runtime.dart';
@@ -22,7 +23,8 @@ class KimodoGenerationOptions {
   /// literally.
   final double textCfg;
 
-  /// Classifier-free guidance on constraints (unused without constraints).
+  /// Classifier-free guidance on constraints: higher follows the
+  /// [KimodoConstraints] more strictly (unused without constraints).
   final double constraintCfg;
 
   const KimodoGenerationOptions({
@@ -122,37 +124,46 @@ class KimodoModel {
     );
   }
 
-  /// Generates [frames] (1..[maxFrames]) frames of motion for [prompt].
+  /// Generates [frames] (1..[maxFrames]) frames of motion for [prompt],
+  /// steered by [constraints] (frames 0..[frames] - 1) when given.
   Future<KimodoMotion> generate(
     String prompt, {
     required int frames,
-    Float32List? observedMotion,
-    Float32List? motionMask,
+    KimodoConstraints? constraints,
     KimodoGenerationOptions options = const KimodoGenerationOptions(),
   }) {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
     }
     RangeError.checkValueInInterval(frames, 1, maxFrames, 'frames');
-    if ((observedMotion != null) != (motionMask != null)) {
-      throw ArgumentError('observedMotion and motionMask must both be provided or both be null');
+    final conditioning = _conditioning(constraints, frames);
+    if (conditioning != null) {
+      return _request({
+        'op': 'constrained',
+        'prompts': [prompt],
+        'frames': [frames],
+        'transition': 0,
+        ...conditioning,
+        ..._options(options),
+      });
     }
     return _request({
       'op': 'generate',
       'prompt': prompt,
       'frames': frames,
-      if (observedMotion != null) 'observedMotion': TransferableTypedData.fromList([observedMotion]),
-      if (motionMask != null) 'motionMask': TransferableTypedData.fromList([motionMask]),
       ..._options(options),
     });
   }
 
   /// Generates one motion from [segments] played in order, each blended into
   /// the next over [transitionFrames] (1..60, shorter than every segment
-  /// after the first) frames.
+  /// after the first) frames, steered by [constraints] when given (frames
+  /// counted over the whole sequence: the segments' frames one after
+  /// another).
   Future<KimodoMotion> generateSequence(
     List<KimodoSegment> segments, {
     int transitionFrames = 5,
+    KimodoConstraints? constraints,
     KimodoGenerationOptions options = const KimodoGenerationOptions(),
   }) {
     if (segments.isEmpty || segments.length > maxSegments) {
@@ -174,13 +185,28 @@ class KimodoModel {
       }
       RangeError.checkValueInInterval(s.frames, 2, maxFrames, 'segment frames');
     }
+    final total = segments.fold<int>(0, (a, s) => a + s.frames);
+    final conditioning = _conditioning(constraints, total);
     return _request({
-      'op': 'sequence',
+      'op': conditioning == null ? 'sequence' : 'constrained',
       'prompts': [for (final s in segments) s.prompt],
       'frames': [for (final s in segments) s.frames],
       'transition': transitionFrames,
+      ...?conditioning,
       ..._options(options),
     });
+  }
+
+  /// The encoded [constraints] for a [frames]-frame timeline, or null when
+  /// there are none (or they pin nothing).
+  static Map<String, Object>? _conditioning(KimodoConstraints? constraints, int frames) {
+    if (constraints == null || constraints.isEmpty) return null;
+    final c = constraints.encode(frames);
+    if (!c.isConstrained) return null;
+    return {
+      'observed': TransferableTypedData.fromList([c.observedFloat32]),
+      'mask': TransferableTypedData.fromList([c.maskFloat32]),
+    };
   }
 
   /// Frees the model and ends its isolate.
@@ -271,6 +297,7 @@ void _worker(SendPort replies) {
           replies.send(const {'ok': true});
         case 'generate':
         case 'sequence':
+        case 'constrained':
           replies.send(_generate(model, command));
         case 'dispose':
           if (model != nullptr) b.flutter_kimodo_model_free(model);
@@ -317,34 +344,13 @@ Map<String, Object> _generate(Pointer<b.kimodo_model> model, Map command) =>
         ..constraint_cfg_weight = command['constraintCfg'] as double;
       final Pointer<b.kimodo_motion> motion;
       if (command['op'] == 'generate') {
-        final observed = command['observedMotion'] as TransferableTypedData?;
-        final mask = command['motionMask'] as TransferableTypedData?;
-        if (observed != null && mask != null) {
-          final observedList = observed.materialize().asFloat32List();
-          final maskList = mask.materialize().asFloat32List();
-          final observedPtr = arena<Float>(observedList.length);
-          final maskPtr = arena<Float>(maskList.length);
-          observedPtr.asTypedList(observedList.length).setAll(0, observedList);
-          maskPtr.asTypedList(maskList.length).setAll(0, maskList);
-          motion = b.flutter_kimodo_generate_conditioned(
-            model,
-            (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
-            command['frames'] as int,
-            observedPtr,
-            maskPtr,
-            options,
-            err,
-            _errLen,
-          );
-        } else {
-          motion = b.flutter_kimodo_generate(
-            model,
-            (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
-            options,
-            err,
-            _errLen,
-          );
-        }
+        motion = b.flutter_kimodo_generate(
+          model,
+          (command['prompt'] as String).toNativeUtf8(allocator: arena).cast(),
+          options,
+          err,
+          _errLen,
+        );
       } else {
         final prompts = (command['prompts'] as List).cast<String>();
         final frames = (command['frames'] as List).cast<int>();
@@ -354,16 +360,42 @@ Map<String, Object> _generate(Pointer<b.kimodo_model> model, Map command) =>
           promptArray[i] = prompts[i].toNativeUtf8(allocator: arena).cast();
           frameArray[i] = frames[i];
         }
-        motion = b.flutter_kimodo_generate_sequence(
-          model,
-          promptArray,
-          frameArray,
-          prompts.length,
-          command['transition'] as int,
-          options,
-          err,
-          _errLen,
-        );
+        if (command['op'] == 'constrained') {
+          final observed = (command['observed'] as TransferableTypedData)
+              .materialize()
+              .asFloat32List();
+          final mask = (command['mask'] as TransferableTypedData)
+              .materialize()
+              .asFloat32List();
+          final observedPtr = arena<Float>(observed.length);
+          final maskPtr = arena<Float>(mask.length);
+          observedPtr.asTypedList(observed.length).setAll(0, observed);
+          maskPtr.asTypedList(mask.length).setAll(0, mask);
+          motion = b.flutter_kimodo_generate_constrained(
+            model,
+            promptArray,
+            frameArray,
+            prompts.length,
+            command['transition'] as int,
+            observedPtr,
+            maskPtr,
+            observed.length,
+            options,
+            err,
+            _errLen,
+          );
+        } else {
+          motion = b.flutter_kimodo_generate_sequence(
+            model,
+            promptArray,
+            frameArray,
+            prompts.length,
+            command['transition'] as int,
+            options,
+            err,
+            _errLen,
+          );
+        }
       }
       if (motion == nullptr) {
         throw KimodoException(

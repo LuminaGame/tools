@@ -42,7 +42,8 @@ typedef int (*motion_int_fn)(const kimodo_motion *);
 typedef const float *(*motion_data_fn)(const kimodo_motion *);
 typedef const char *(*backends_fn)(void);
 typedef int (*configure_fn)(kimodo_device, int, int, char *, int);
-typedef kimodo_motion *(*generate_conditioned_fn)(kimodo_model *, const char *, uint32_t, const float *, const float *,
+typedef kimodo_motion *(*generate_constrained_fn)(kimodo_model *, const char *const *, const uint32_t *, uint32_t,
+                                                  uint32_t, const float *, const float *, uint64_t,
                                                   const kimodo_generation_options *, char *, int);
 typedef kimodo_motion *(*sequence_fn)(kimodo_model *, const char *const *, const uint32_t *, uint32_t, uint32_t,
                                       const kimodo_generation_options *, char *, int);
@@ -54,7 +55,7 @@ static struct {
   model_load_fn model_load;
   model_free_fn model_free;
   generate_fn generate;
-  generate_conditioned_fn generate_conditioned;
+  generate_constrained_fn generate_constrained;
   motion_free_fn motion_free;
   motion_int_fn motion_frames;
   motion_int_fn motion_joints;
@@ -152,7 +153,7 @@ int32_t flutter_kimodo_open(const char *runtime_dir, char *err, int32_t err_len)
   FK_BIND(model_load, model_load_fn, "kimodo_model_load");
   FK_BIND(model_free, model_free_fn, "kimodo_model_free");
   FK_BIND(generate, generate_fn, "kimodo_generate");
-  FK_BIND(generate_conditioned, generate_conditioned_fn, "kimodo_lumina_generate_conditioned");
+  FK_BIND(generate_constrained, generate_constrained_fn, "kimodo_lumina_generate_constrained");
   FK_BIND(motion_free, motion_free_fn, "kimodo_motion_free");
   FK_BIND(motion_frames, motion_int_fn, "kimodo_motion_frames");
   FK_BIND(motion_joints, motion_int_fn, "kimodo_motion_joints");
@@ -216,14 +217,17 @@ kimodo_motion *flutter_kimodo_generate(kimodo_model *model, const char *prompt,
   return K.generate(model, prompt, options, err, err_len);
 }
 
-kimodo_motion *flutter_kimodo_generate_conditioned(kimodo_model *model, const char *prompt, uint32_t frames,
+kimodo_motion *flutter_kimodo_generate_constrained(kimodo_model *model, const char *const *prompts,
+                                                   const uint32_t *frames, uint32_t count, uint32_t transition_frames,
                                                    const float *observed_motion, const float *motion_mask,
-                                                   const kimodo_generation_options *options, char *err, int32_t err_len) {
+                                                   uint64_t values, const kimodo_generation_options *options,
+                                                   char *err, int32_t err_len) {
   if (!K.lib) {
     fk_error(err, err_len, "kimodo is not loaded");
     return NULL;
   }
-  return K.generate_conditioned(model, prompt, frames, observed_motion, motion_mask, options, err, err_len);
+  return K.generate_constrained(model, prompts, frames, count, transition_frames, observed_motion, motion_mask, values,
+                                options, err, err_len);
 }
 
 kimodo_motion *flutter_kimodo_generate_sequence(kimodo_model *model, const char *const *prompts,

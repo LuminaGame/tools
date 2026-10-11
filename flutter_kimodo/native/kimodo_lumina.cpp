@@ -4,6 +4,7 @@
 #include <kimodo/kimodo.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -95,9 +96,9 @@ kimodo_motion *kimodo_lumina_generate_sequence(
     catch (...) { return fail("unknown C++ exception"); }
 }
 
-kimodo_motion *kimodo_lumina_generate_conditioned(
-    kimodo_model *model, const char *prompt, uint32_t frames,
-    const float *observed_motion, const float *motion_mask,
+kimodo_motion *kimodo_lumina_generate_constrained(
+    kimodo_model *model, const char *const *prompts, const uint32_t *frames, uint32_t count,
+    uint32_t transition_frames, const float *observed_motion, const float *motion_mask, uint64_t values,
     const kimodo_generation_options *options, char *err, int err_len) {
     auto fail = [&](const std::string &message) -> kimodo_motion * {
         if (model) model->last_error = message;
@@ -107,17 +108,32 @@ kimodo_motion *kimodo_lumina_generate_conditioned(
     try {
         if (!model || !model->value) return fail("invalid model");
         if (!options || options->size != sizeof(*options)) return fail("invalid kimodo_generation_options");
-        if (!prompt) return fail("prompt is NULL");
+        if (!prompts || !frames || count == 0 || count > 16) return fail("constrained generation needs 1..16 prompts");
         if (!observed_motion || !motion_mask) return fail("observed_motion and motion_mask are required");
-        
-        std::span<const float> obs(observed_motion, static_cast<size_t>(frames) * 369);
-        std::span<const float> mask(motion_mask, static_cast<size_t>(frames) * 369);
-
-        auto generated = model->value->generate_text(
-            prompt, frames, options->diffusion_steps, options->seed,
-            options->text_cfg_weight, options->constraint_cfg_weight,
-            obs, mask);
-        
+        uint64_t total = 0;
+        std::vector<kimodo::prompt_segment> segments;
+        segments.reserve(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            if (!prompts[i]) return fail("prompt " + std::to_string(i) + " is NULL");
+            if (frames[i] == 0) return fail("prompt " + std::to_string(i) + " has no frames");
+            segments.push_back({prompts[i], frames[i]});
+            total += frames[i];
+        }
+        if (values == 0 || values % total != 0)
+            return fail("the constraint tensors must hold [" + std::to_string(total) + ", motion_dim] values, got " +
+                        std::to_string(values));
+        for (uint64_t i = 0; i < values; ++i) {
+            const float m = motion_mask[i];
+            if (m != 0.F && m != 1.F) return fail("motion_mask value " + std::to_string(i) + " is neither 0 nor 1");
+            if (!std::isfinite(observed_motion[i])) return fail("observed_motion value " + std::to_string(i) + " is not finite");
+        }
+        const std::span<const float> observed(observed_motion, static_cast<size_t>(values));
+        const std::span<const float> mask(motion_mask, static_cast<size_t>(values));
+        auto generated = count == 1
+            ? model->value->generate_text(prompts[0], frames[0], options->diffusion_steps, options->seed,
+                                          options->text_cfg_weight, options->constraint_cfg_weight, observed, mask)
+            : model->value->generate_text_sequence(segments, transition_frames, options->diffusion_steps, options->seed,
+                                                   options->text_cfg_weight, options->constraint_cfg_weight, observed, mask);
         if (!generated) return fail(generated.error());
         model->last_error.clear();
         return new kimodo_motion{std::move(*generated)};

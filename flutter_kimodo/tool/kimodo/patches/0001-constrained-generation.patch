@@ -1,0 +1,233 @@
+diff --git a/include/kimodo/kimodo.hpp b/include/kimodo/kimodo.hpp
+index e774e5a..283c61d 100644
+--- a/include/kimodo/kimodo.hpp
++++ b/include/kimodo/kimodo.hpp
+@@ -31,16 +31,29 @@ class KIMODO_API model {
+ public:
+     static std::expected<std::unique_ptr<model>, std::string> load(
+         std::string_view motion_gguf, std::string_view text_bundle = {});
++    // `observed_motion` / `motion_mask`, when given, are [frames, motion_dim]
++    // row-major conditioning tensors in the motion representation's
++    // unnormalised feature space (upstream `create_conditions(...,
++    // to_normalize=False)`): masked channels are constrained, the library
++    // normalises them with the checkpoint's statistics.
+     std::expected<motion_data, std::string> generate_embedding(
+         const std::array<float, embedding_width> &embedding,
+         unsigned frames, unsigned steps, std::uint64_t seed,
+-        float text_cfg, float constraint_cfg) const;
++        float text_cfg, float constraint_cfg,
++        std::span<const float> observed_motion = {},
++        std::span<const float> motion_mask = {}) const;
+     std::expected<motion_data, std::string> generate_text(
+         std::string_view utf8_prompt, unsigned frames, unsigned steps, std::uint64_t seed,
+-        float text_cfg, float constraint_cfg) const;
++        float text_cfg, float constraint_cfg,
++        std::span<const float> observed_motion = {},
++        std::span<const float> motion_mask = {}) const;
+     std::expected<motion_data, std::string> generate_text_sequence(
+         std::span<const prompt_segment> segments, unsigned transition_frames,
+-        unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg) const;
++        unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg,
++        // Conditioning over the joined timeline (the sum of the segments'
++        // frames), unnormalised as above; each segment takes its rows.
++        std::span<const float> observed_motion = {},
++        std::span<const float> motion_mask = {}) const;
+     ~model();
+     model(const model &) = delete;
+     model &operator=(const model &) = delete;
+diff --git a/src/denoiser.hpp b/src/denoiser.hpp
+index 8749607..793cd23 100644
+--- a/src/denoiser.hpp
++++ b/src/denoiser.hpp
+@@ -68,7 +68,8 @@ std::expected<std::vector<float>, std::string> sample_motion_from_noise_conditio
+ // translated roots and blended tail preserve upstream semantics.
+ std::expected<std::vector<float>, std::string> sample_motion_sequence_from_noise(
+     const ggml_motion_weights &weights, std::span<const sampled_sequence_segment> segments,
+-    unsigned transition_frames, unsigned steps, float text_weight, float constraint_weight);
++    unsigned transition_frames, unsigned steps, float text_weight, float constraint_weight,
++    std::span<const float> observed = {}, std::span<const float> observed_mask = {});
+ 
+ // Build the exact condition consumed by the next `_multiprompt` DDIM run.
+ // Exposed for the raw fixture test as well as the runtime orchestrator.
+diff --git a/src/model.cpp b/src/model.cpp
+index 91d2ec0..1058bc3 100644
+--- a/src/model.cpp
++++ b/src/model.cpp
+@@ -52,21 +52,24 @@ std::expected<std::unique_ptr<model>, std::string> model::load(std::string_view
+ 
+ std::expected<motion_data, std::string> model::generate_text(
+     std::string_view utf8_prompt, unsigned frames, unsigned steps, std::uint64_t seed,
+-    float text_cfg, float constraint_cfg) const {
++    float text_cfg, float constraint_cfg,
++    std::span<const float> observed_motion, std::span<const float> motion_mask) const {
+ #ifdef KIMODO_HAVE_GGML
+     if (!impl_->text) return std::unexpected("model was loaded without a native text bundle");
+     auto embedding = impl_->text->encode(utf8_prompt);
+     if (!embedding) return std::unexpected(embedding.error());
+-    return generate_embedding(*embedding, frames, steps, seed, text_cfg, constraint_cfg);
++    return generate_embedding(*embedding, frames, steps, seed, text_cfg, constraint_cfg, observed_motion, motion_mask);
+ #else
+     (void) utf8_prompt; (void) frames; (void) steps; (void) seed; (void) text_cfg; (void) constraint_cfg;
++    (void) observed_motion; (void) motion_mask;
+     return std::unexpected("Kimodo was built without GGML support");
+ #endif
+ }
+ 
+ std::expected<motion_data, std::string> model::generate_embedding(
+     const std::array<float, embedding_width> &embedding, unsigned frames, unsigned steps,
+-    std::uint64_t seed, float text_cfg, float constraint_cfg) const {
++    std::uint64_t seed, float text_cfg, float constraint_cfg,
++    std::span<const float> observed_motion, std::span<const float> motion_mask) const {
+     if (frames == 0 || frames > 10000) return std::unexpected("frames must be in 1..10000");
+     if (steps == 0 || steps > 1000) return std::unexpected("diffusion_steps must be in 1..1000");
+     if (!std::isfinite(text_cfg) || !std::isfinite(constraint_cfg)) return std::unexpected("CFG weights must be finite");
+@@ -91,15 +94,34 @@ std::expected<motion_data, std::string> model::generate_embedding(
+     std::vector<float> noise(static_cast<size_t>(frames)*motion_dim);
+     for (float &value : noise) value = normal(rng);
+     const auto sampling_started = std::chrono::steady_clock::now();
+-    auto sampled = detail::sample_motion_from_noise(*impl_->weights, noise, embedding, frames, steps, text_cfg, constraint_cfg);
+-    if (!sampled) return std::unexpected(sampled.error());
+-    const double sampling_ms = detail::profile_elapsed_ms(sampling_started);
+     auto global_mean=impl_->weights->f32_values("stats.global_root.mean"), global_std=impl_->weights->f32_values("stats.global_root.std");
+     auto body_mean=impl_->weights->f32_values("stats.body.mean"), body_std=impl_->weights->f32_values("stats.body.std");
+     if (!global_mean) return std::unexpected(global_mean.error());
+     if (!global_std) return std::unexpected(global_std.error());
+     if (!body_mean) return std::unexpected(body_mean.error());
+     if (!body_std) return std::unexpected(body_std.error());
++    std::expected<std::vector<float>, std::string> sampled;
++    if (!motion_mask.empty()) {
++        if (observed_motion.size() != motion_mask.size() || motion_mask.size() != noise.size())
++            return std::unexpected("observed_motion and motion_mask must be [frames, motion_dim]");
++        const size_t body_dim=impl_->skeleton->body_dim();
++        if (global_mean->size() != 5 || global_std->size() != 5 || body_mean->size() != body_dim || body_std->size() != body_dim)
++            return std::unexpected("motion GGUF lacks compatible motion statistics");
++        // Upstream normalises the conditioning before sampling
++        // (`motion_rep.normalize(observed_motion)`).
++        std::vector<float> observed(observed_motion.begin(), observed_motion.end());
++        for (size_t row=0; row<frames; ++row) {
++            auto *v=observed.data()+row*motion_dim;
++            for (size_t d=0; d<5; ++d) v[d]=(v[d]-(*global_mean)[d])/std::sqrt((*global_std)[d]*(*global_std)[d]+1.e-5F);
++            for (size_t d=0; d<body_dim; ++d) v[5+d]=(v[5+d]-(*body_mean)[d])/std::sqrt((*body_std)[d]*(*body_std)[d]+1.e-5F);
++        }
++        sampled = detail::sample_motion_from_noise_conditioned(*impl_->weights, noise, embedding,
++            observed, motion_mask, 0.0f, frames, steps, text_cfg, constraint_cfg);
++    } else {
++        sampled = detail::sample_motion_from_noise(*impl_->weights, noise, embedding, frames, steps, text_cfg, constraint_cfg);
++    }
++    if (!sampled) return std::unexpected(sampled.error());
++    const double sampling_ms = detail::profile_elapsed_ms(sampling_started);
+     const auto decode_started = std::chrono::steady_clock::now();
+     auto decoded=detail::decode_motion(*sampled,frames,*impl_->skeleton,*global_mean,*global_std,*body_mean,*body_std);
+     if (!decoded) return std::unexpected(decoded.error());
+@@ -119,7 +141,8 @@ std::expected<motion_data, std::string> model::generate_embedding(
+ 
+ std::expected<motion_data, std::string> model::generate_text_sequence(
+     std::span<const prompt_segment> segments, unsigned transition_frames,
+-    unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg) const {
++    unsigned steps, std::uint64_t seed, float text_cfg, float constraint_cfg,
++    std::span<const float> observed_motion, std::span<const float> motion_mask) const {
+ #ifdef KIMODO_HAVE_GGML
+     if (!impl_->text) return std::unexpected("model was loaded without a native text bundle");
+     if (segments.empty() || segments.size() > 16) return std::unexpected("sequence requires 1..16 prompt segments");
+@@ -160,7 +183,7 @@ std::expected<motion_data, std::string> model::generate_text_sequence(
+         for (float &value : noise.back()) value=normal(rng);
+         sampled.push_back({embeddings[index], noise.back(), segment.frames});
+     }
+-    auto joined=detail::sample_motion_sequence_from_noise(*impl_->weights,sampled,transition_frames,steps,text_cfg,constraint_cfg);
++    auto joined=detail::sample_motion_sequence_from_noise(*impl_->weights,sampled,transition_frames,steps,text_cfg,constraint_cfg,observed_motion,motion_mask);
+     if (!joined) return std::unexpected(joined.error());
+     const size_t motion_dim=impl_->skeleton->motion_dim(), body_dim=impl_->skeleton->body_dim();
+     const auto frames=static_cast<unsigned>(joined->size()/motion_dim);
+@@ -177,6 +200,7 @@ std::expected<motion_data, std::string> model::generate_text_sequence(
+     return result;
+ #else
+     (void) segments; (void) transition_frames; (void) steps; (void) seed; (void) text_cfg; (void) constraint_cfg;
++    (void) observed_motion; (void) motion_mask;
+     return std::unexpected("Kimodo was built without GGML support");
+ #endif
+ }
+diff --git a/src/sequence.cpp b/src/sequence.cpp
+index 6dbf6da..46e8910 100644
+--- a/src/sequence.cpp
++++ b/src/sequence.cpp
+@@ -56,7 +56,8 @@ std::expected<sequence_transition, std::string> prepare_sequence_transition(
+ 
+ std::expected<std::vector<float>, std::string> sample_motion_sequence_from_noise(
+     const ggml_motion_weights &weights, std::span<const sampled_sequence_segment> segments,
+-    unsigned transition_frames, unsigned steps, float text_weight, float constraint_weight) {
++    unsigned transition_frames, unsigned steps, float text_weight, float constraint_weight,
++    std::span<const float> observed, std::span<const float> observed_mask) {
+     const size_t D=weights.motion_dim(),body=D-5;
+     if(segments.empty()||!transition_frames||!D)return std::unexpected("sequence requires segments and a transition");
+     auto gm=weights.f32_values("stats.global_root.mean"),gs=weights.f32_values("stats.global_root.std");
+@@ -65,8 +66,69 @@ std::expected<std::vector<float>, std::string> sample_motion_sequence_from_noise
+     auto scale=[](float stddev){return std::sqrt(stddev*stddev+1.e-5F);};
+     auto unnormalize=[&](std::vector<float>&motion){for(size_t row=0;row<motion.size()/D;++row){auto*v=motion.data()+row*D;for(size_t d=0;d<5;++d)v[d]=v[d]*scale((*gs)[d])+(*gm)[d];for(size_t d=0;d<body;++d)v[5+d]=v[5+d]*scale((*bs)[d])+(*bm)[d];}};
+     auto normalize=[&](std::vector<float>&motion){for(size_t row=0;row<motion.size()/D;++row){auto*v=motion.data()+row*D;for(size_t d=0;d<5;++d)v[d]=(v[d]-(*gm)[d])/scale((*gs)[d]);for(size_t d=0;d<body;++d)v[5+d]=(v[5+d]-(*bm)[d])/scale((*bs)[d]);}};
++    // Caller constraints over the joined timeline (upstream `_multiprompt`'s
++    // constraint_lst, already encoded and unnormalised): each segment takes
++    // the rows of its own frames.
++    size_t total=0;
++    for(const auto&segment:segments)total+=segment.frames;
++    const bool constrained=!observed_mask.empty();
++    if(constrained&&(observed.size()!=observed_mask.size()||observed_mask.size()!=total*D))
++        return std::unexpected("observed_motion and motion_mask must cover the sum of the segment frames");
++    auto any_mask=[&](size_t first,size_t frames){if(!constrained)return false;for(size_t i=first*D;i<(first+frames)*D;++i)if(observed_mask[i]!=0.F)return true;return false;};
+     std::vector<float> joined,previous;
+-    for(size_t index=0;index<segments.size();++index){const auto&segment=segments[index];const size_t sampled_frames=segment.frames+(index?transition_frames:0);if(segment.frames<2||segment.embedding.size()!=4096||segment.initial_noise.size()!=sampled_frames*D)return std::unexpected("invalid sampled sequence segment");std::vector<float>current;if(!index){auto sampled=sample_motion_from_noise(weights,segment.initial_noise,segment.embedding,sampled_frames,steps,text_weight,constraint_weight);if(!sampled)return std::unexpected(sampled.error());current=std::move(*sampled);unnormalize(current);}else{const size_t overlap=transition_frames;if(overlap>=segment.frames||previous.size()<overlap*D)return std::unexpected("transition must be shorter than every following segment");auto transition=prepare_sequence_transition(weights,previous,segment.frames,transition_frames);if(!transition)return std::unexpected(transition.error());const float origin_x=transition->origin_x,origin_z=transition->origin_z;normalize(transition->observed);auto sampled=sample_motion_from_noise_conditioned(weights,segment.initial_noise,segment.embedding,transition->observed,transition->observed_mask,transition->first_heading,sampled_frames,steps,text_weight,constraint_weight);if(!sampled)return std::unexpected(sampled.error());current=std::move(*sampled);unnormalize(current);for(size_t frame=0;frame<sampled_frames;++frame){auto*row=current.data()+frame*D;row[0]+=origin_x;row[2]+=origin_z;}const size_t start=joined.size()-overlap*D;for(size_t frame=0;frame<overlap;++frame){const float alpha=overlap==1?.5F:1.F-float(frame)/float(overlap-1);for(size_t d=0;d<D;++d)joined[start+frame*D+d]=alpha*joined[start+frame*D+d]+(1.F-alpha)*current[frame*D+d];}joined.insert(joined.end(),current.begin()+static_cast<std::ptrdiff_t>(overlap*D),current.end());}if(!index)joined=current;previous=std::move(current);}
++    size_t segment_start=0;
++    for(size_t index=0;index<segments.size();++index){
++        const auto&segment=segments[index];
++        const size_t sampled_frames=segment.frames+(index?transition_frames:0);
++        if(segment.frames<2||segment.embedding.size()!=4096||segment.initial_noise.size()!=sampled_frames*D)return std::unexpected("invalid sampled sequence segment");
++        std::vector<float>current;
++        if(!index){
++            std::expected<std::vector<float>, std::string> sampled;
++            if(any_mask(segment_start,segment.frames)){
++                std::vector<float> rows(observed.begin()+static_cast<std::ptrdiff_t>(segment_start*D),observed.begin()+static_cast<std::ptrdiff_t>((segment_start+segment.frames)*D));
++                std::vector<float> mask(observed_mask.begin()+static_cast<std::ptrdiff_t>(segment_start*D),observed_mask.begin()+static_cast<std::ptrdiff_t>((segment_start+segment.frames)*D));
++                normalize(rows);
++                sampled=sample_motion_from_noise_conditioned(weights,segment.initial_noise,segment.embedding,rows,mask,0.F,sampled_frames,steps,text_weight,constraint_weight);
++            }else{
++                sampled=sample_motion_from_noise(weights,segment.initial_noise,segment.embedding,sampled_frames,steps,text_weight,constraint_weight);
++            }
++            if(!sampled)return std::unexpected(sampled.error());
++            current=std::move(*sampled);unnormalize(current);
++        }else{
++            const size_t overlap=transition_frames;
++            if(overlap>=segment.frames||previous.size()<overlap*D)return std::unexpected("transition must be shorter than every following segment");
++            auto transition=prepare_sequence_transition(weights,previous,segment.frames,transition_frames);
++            if(!transition)return std::unexpected(transition.error());
++            const float origin_x=transition->origin_x,origin_z=transition->origin_z;
++            if(any_mask(segment_start,segment.frames)){
++                // The segment's own constraints follow the transition rows,
++                // moved like them to the transition's starting point and
++                // with their unconstrained channels cleared.
++                for(size_t frame=0;frame<segment.frames;++frame){
++                    const size_t src=(segment_start+frame)*D,dst=(overlap+frame)*D;
++                    for(size_t d=0;d<D;++d){
++                        const float m=observed_mask[src+d];
++                        float v=observed[src+d];
++                        if(d==0)v-=origin_x;
++                        if(d==2)v-=origin_z;
++                        transition->observed[dst+d]=v*m;
++                        transition->observed_mask[dst+d]=m;
++                    }
++                }
++            }
++            normalize(transition->observed);
++            auto sampled=sample_motion_from_noise_conditioned(weights,segment.initial_noise,segment.embedding,transition->observed,transition->observed_mask,transition->first_heading,sampled_frames,steps,text_weight,constraint_weight);
++            if(!sampled)return std::unexpected(sampled.error());
++            current=std::move(*sampled);unnormalize(current);
++            for(size_t frame=0;frame<sampled_frames;++frame){auto*row=current.data()+frame*D;row[0]+=origin_x;row[2]+=origin_z;}
++            const size_t start=joined.size()-overlap*D;
++            for(size_t frame=0;frame<overlap;++frame){const float alpha=overlap==1?.5F:1.F-float(frame)/float(overlap-1);for(size_t d=0;d<D;++d)joined[start+frame*D+d]=alpha*joined[start+frame*D+d]+(1.F-alpha)*current[frame*D+d];}
++            joined.insert(joined.end(),current.begin()+static_cast<std::ptrdiff_t>(overlap*D),current.end());
++        }
++        if(!index)joined=current;
++        previous=std::move(current);
++        segment_start+=segment.frames;
++    }
+     return joined;
+ }
+ } // namespace kimodo::detail

@@ -22,6 +22,8 @@ void main(List<String> args) async {
     final version = File.fromUri(
       input.packageRoot.resolve('tool/kimodo/VERSION'),
     ).readAsStringSync().trim();
+    // A new prebuilt version (another folder) must re-run the hook.
+    output.dependencies.add(input.packageRoot.resolve('tool/kimodo/VERSION'));
     final library = kimodoLibrary(os);
     final env = Platform.environment['LUMINA_KIMODO_DIR'];
     final dir = resolveKimodoDir(

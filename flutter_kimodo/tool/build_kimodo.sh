@@ -63,6 +63,14 @@ if [ "$(git -C "$src" rev-parse --verify -q HEAD || true)" != "$commit" ]; then
   git -C "$src" fetch -q --depth 1 origin "$commit"
   git -C "$src" checkout -q --force "$commit"
 fi
+# flutter_kimodo's changes to kimodo.cpp (tool/kimodo/patches/*.patch, in
+# order) on a clean LF checkout; a checkout that already has them is kept.
+patches=("$here"/kimodo/patches/*.patch)
+if [ -e "${patches[0]}" ] && ! git -C "$src" apply --check --reverse "${patches[@]}" 2>/dev/null; then
+  log "applying ${#patches[@]} patch(es)"
+  git -C "$src" -c core.autocrlf=false checkout -q --force "$commit"
+  git -C "$src" -c core.autocrlf=false apply "${patches[@]}"
+fi
 git -C "$src" submodule update --init --depth 1 -q
 ggml="$(git -C "$src/ggml" rev-parse HEAD)"
 log "ggml $ggml"

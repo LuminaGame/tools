@@ -46,15 +46,25 @@ KIMODO_API kimodo_motion *kimodo_lumina_generate_sequence(
     int err_len);
 
 /*
- * Generates one motion from a prompt, applying the provided SOMA constraint
- * tensors. `observed_motion` and `motion_mask` must be [frames, 369] row-major.
+ * Generates one motion from `count` (1..16) prompts like
+ * kimodo_lumina_generate_sequence (one prompt: like kimodo_generate), steered
+ * by constraints: `observed_motion` and `motion_mask` hold `values` floats,
+ * [sum(frames), motion_dim] row-major, the conditioning tensors of NVIDIA
+ * Kimodo's constraint sets in the motion representation's unnormalised
+ * feature space (upstream `create_conditions(..., to_normalize=False)`); a
+ * mask value is 0 (free) or 1 (constrained). The library normalises them;
+ * with several prompts each segment takes the rows of its own frames.
+ * Returns an owning motion or NULL with a reason in `err`.
  */
-KIMODO_API kimodo_motion *kimodo_lumina_generate_conditioned(
+KIMODO_API kimodo_motion *kimodo_lumina_generate_constrained(
     kimodo_model *model,
-    const char *prompt,
-    uint32_t frames,
+    const char *const *prompts,
+    const uint32_t *frames,
+    uint32_t count,
+    uint32_t transition_frames,
     const float *observed_motion,
     const float *motion_mask,
+    uint64_t values,
     const kimodo_generation_options *options,
     char *err,
     int err_len);
