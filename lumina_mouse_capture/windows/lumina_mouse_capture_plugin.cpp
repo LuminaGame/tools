@@ -94,8 +94,11 @@ LuminaMouseCapturePlugin::~LuminaMouseCapturePlugin() {
   if (window_proc_id_ >= 0) {
     registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_id_);
   }
-  if (channel_) channel_->SetMethodCallHandler(nullptr);
-  if (event_channel_) event_channel_->SetStreamHandler(nullptr);
+  // The channels' handlers are not cleared here: plugins are destroyed while
+  // the engine shuts down, after the messenger has let go of the engine, and
+  // FlutterDesktopMessengerSetCallback then dereferences the missing engine
+  // (an access violation on every window close). The channels go with the
+  // engine.
   sink_.reset();
   // Gives the pointer back (no event: the engine is going away).
   capture_.reset();
