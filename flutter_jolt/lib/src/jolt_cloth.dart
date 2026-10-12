@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -61,6 +62,31 @@ class JoltClothSettings {
   bool doubleSided;
 }
 
+/// How a cloth is skinned to a skeleton (a garment on a character), in the
+/// cloth's creation frame (metres): one inverse bind matrix per joint, up to
+/// four joints and weights per vertex, and per vertex how far it may leave
+/// its skinned position ([maxDistances], 0 hard-skins it) and an optional
+/// backstop behind it.
+class JoltClothSkin {
+  JoltClothSkin({
+    required this.inverseBinds,
+    required this.joints,
+    required this.weights,
+    required this.maxDistances,
+    this.backstopDistances,
+    this.backstopRadius = 0.4,
+  });
+
+  final List<Matrix4> inverseBinds;
+
+  /// Four entries per vertex (indices into [inverseBinds]).
+  final Uint32List joints;
+  final Float32List weights;
+  final Float32List maxDistances;
+  final Float32List? backstopDistances;
+  final double backstopRadius;
+}
+
 /// Cloth soft bodies in a [JoltWorld]. A cloth collides with the world's
 /// rigid bodies (it is pushed, it does not push back on static ones) and is
 /// read back as world vertex positions every frame.
@@ -75,9 +101,18 @@ extension JoltWorldCloth on JoltWorld {
     Vector3? position,
     Quaternion? rotation,
     JoltClothSettings? settings,
+    JoltClothSkin? skin,
     int userData = 0,
   }) {
     JoltPhysics.ensureAvailable();
+    if (skin != null &&
+        (skin.joints.length < vertices.length * 4 ||
+            skin.weights.length < vertices.length * 4 ||
+            skin.maxDistances.length < vertices.length)) {
+      throw ArgumentError(
+        'skin needs four joints and weights and a max distance per vertex',
+      );
+    }
     if (inverseMasses != null && inverseMasses.length != vertices.length) {
       throw ArgumentError('inverseMasses needs one value per vertex');
     }
@@ -126,18 +161,30 @@ extension JoltWorldCloth on JoltWorld {
         ..update_position = true
         ..allow_sleeping = s.allowSleeping
         ..double_sided = s.doubleSided;
-      final id = b.jolt_soft_body_create(
-        handle,
-        pos,
-        inv,
-        n,
-        idx,
-        triangles.length,
-        pose,
-        pose + 3,
-        cs,
-        userData,
-      );
+      final id = skin == null
+          ? b.jolt_soft_body_create(
+              handle,
+              pos,
+              inv,
+              n,
+              idx,
+              triangles.length,
+              pose,
+              pose + 3,
+              cs,
+              userData,
+            )
+          : _createSkinned(
+              pos,
+              inv,
+              n,
+              idx,
+              triangles.length,
+              pose,
+              cs,
+              skin,
+              userData,
+            );
       if (id == JoltPhysics.invalidBodyId) {
         throw ArgumentError('Jolt could not build the cloth');
       }
@@ -283,4 +330,97 @@ extension JoltWorldCloth on JoltWorld {
   /// Pins vertex [index] where it is ([inverseMass] 0) or frees it.
   void setClothInverseMass(int body, int index, double inverseMass) =>
       b.jolt_soft_body_set_inverse_mass(handle, body, index, inverseMass);
+
+  int _createSkinned(
+    Pointer<Float> pos,
+    Pointer<Float> inv,
+    int n,
+    Pointer<Uint32> idx,
+    int indexCount,
+    Pointer<Float> pose,
+    Pointer<b.JoltClothSettings> cs,
+    JoltClothSkin skin,
+    int userData,
+  ) {
+    final jointCount = skin.inverseBinds.length;
+    final binds = calloc<Float>(math.max(1, jointCount) * 16);
+    final joints = calloc<Uint32>(n * 4);
+    final weights = calloc<Float>(n * 4);
+    final maxD = calloc<Float>(n);
+    final back = calloc<Float>(n);
+    final sk = calloc<b.JoltClothSkin>();
+    try {
+      for (var j = 0; j < jointCount; j++) {
+        binds
+            .asTypedList(jointCount * 16)
+            .setRange(
+              16 * j,
+              16 * j + 16,
+              skin.inverseBinds[j].storage.map((v) => v),
+            );
+      }
+      joints.asTypedList(n * 4).setAll(0, skin.joints.sublist(0, n * 4));
+      weights.asTypedList(n * 4).setAll(0, skin.weights.sublist(0, n * 4));
+      maxD.asTypedList(n).setAll(0, skin.maxDistances.sublist(0, n));
+      final backstop = skin.backstopDistances;
+      back
+          .asTypedList(n)
+          .setAll(
+            0,
+            backstop == null
+                ? (Float32List(n)..fillRange(0, n, 1e30))
+                : backstop.sublist(0, n),
+          );
+      sk.ref
+        ..inverse_binds = binds
+        ..joint_count = jointCount
+        ..joints = joints
+        ..weights = weights
+        ..max_distances = maxD
+        ..backstop_distances = back
+        ..backstop_radius = skin.backstopRadius;
+      return b.jolt_skinned_cloth_create(
+        handle,
+        pos,
+        inv,
+        n,
+        idx,
+        indexCount,
+        pose,
+        pose + 3,
+        cs,
+        sk,
+        userData,
+      );
+    } finally {
+      calloc
+        ..free(binds)
+        ..free(joints)
+        ..free(weights)
+        ..free(maxD)
+        ..free(back)
+        ..free(sk);
+    }
+  }
+
+  /// Poses a skinned cloth's skeleton: [jointWorld] holds one column-major
+  /// 4x4 matrix per joint in the world (metres), 16 floats each, in the
+  /// order of [JoltClothSkin.inverseBinds]. [hardSkinAll] puts every vertex
+  /// on its skinned position (after creating it, or a teleport).
+  void skinCloth(int body, Float32List jointWorld, {bool hardSkinAll = false}) {
+    final count = jointWorld.length ~/ 16;
+    if (count == 0) return;
+    final m = calloc<Float>(count * 16);
+    try {
+      m.asTypedList(count * 16).setAll(0, jointWorld.sublist(0, count * 16));
+      b.jolt_soft_body_skin(handle, body, m, count, hardSkinAll);
+    } finally {
+      calloc.free(m);
+    }
+  }
+
+  /// Marks [body] as a collider for cloths of its owner (a character's limb
+  /// capsules for its garment); a cloth ignores its owner's other bodies.
+  void setBodyClothCollider(int body, bool clothCollider) =>
+      b.jolt_body_set_cloth_collider(handle, body, clothCollider);
 }

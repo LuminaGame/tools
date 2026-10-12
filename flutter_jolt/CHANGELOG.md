@@ -13,6 +13,8 @@
 - Cloth soft bodies: `JoltWorld.createCloth` with pinned vertices, edge /
   shear / bend compliances, tethers, aerodynamic wind, driven pins, vertex
   and normal read-back in a caller's frame.
+- Skinned cloth (garments): skin weights, inverse binds, max distances,
+  per-step skinning; cloths ignore their owner's bodies except colliders.
 - `tool/build_jolt.bat` / `tool/build_jolt.sh` fetch the pinned Jolt release
   and build a static library; the native-assets hook links it with the same
   `JPH_*` defines, or builds nothing when no Jolt build exists

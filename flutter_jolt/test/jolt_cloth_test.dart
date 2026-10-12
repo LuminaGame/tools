@@ -271,4 +271,112 @@ void main() {
       world.step(1 / 120);
     },
   );
+
+  test(
+    'a skinned strip follows its joint: hard-skinned vertices exactly, free ones within their max distance',
+    () {
+      final world = JoltWorld(workerThreads: 0);
+      addTearDown(world.dispose);
+      // A 1 m strip hanging along -Y from y = 0, in its creation frame at the
+      // origin; joint 0 at the top (hard skin), joint 1 at the bottom.
+      const n = 9;
+      final (flat, t) = grid(n, 1.0);
+      final v = [for (final p in flat) Vector3(p.x, -(p.z + 0.5), 0)];
+      final count = v.length;
+      final joints = Uint32List(count * 4),
+          weights = Float32List(count * 4),
+          maxD = Float32List(count);
+      for (var i = 0; i < count; i++) {
+        final down = -v[i].y; // 0 at the top, 1 at the bottom
+        joints[4 * i] = 0;
+        joints[4 * i + 1] = 1;
+        weights[4 * i] = 1 - down;
+        weights[4 * i + 1] = down;
+        maxD[i] = down < 1e-6 ? 0 : 0.2 * down;
+      }
+      final binds = [
+        Matrix4.identity(),
+        Matrix4.translationValues(0, -1, 0)..invert(),
+      ];
+      final cloth = world.createCloth(
+        v,
+        t,
+        skin: JoltClothSkin(
+          inverseBinds: binds,
+          joints: joints,
+          weights: weights,
+          maxDistances: maxD,
+        ),
+      );
+      Float32List pose(double x) => Float32List.fromList([
+        ...Matrix4.translationValues(x, 2, 0).storage,
+        ...Matrix4.translationValues(x, 1, 0).storage,
+      ]);
+      world.skinCloth(cloth, pose(0), hardSkinAll: true);
+      var p = world.clothVertices(cloth);
+      expect(
+        at(p, 0).y,
+        closeTo(2, 1e-4),
+        reason: 'hard skinned to the joint at y = 2',
+      );
+      // Move the skeleton 1 m along +X over a second.
+      for (var step = 1; step <= 120; step++) {
+        world.skinCloth(cloth, pose(step / 120));
+        world.step(1 / 120);
+      }
+      p = world.clothVertices(cloth);
+      for (var i = 0; i < count; i++) {
+        final down = -v[i].y;
+        final skinned = Vector3(v[i].x + 1, 2 + v[i].y, 0);
+        expect(
+          at(p, i).distanceTo(skinned),
+          lessThan(0.2 * down + 0.01),
+          reason: 'vertex $i within its max distance',
+        );
+      }
+    },
+  );
+
+  test(
+    'a cloth ignores the bodies of its owner unless they are its colliders',
+    () {
+      for (final collider in [false, true]) {
+        final world = JoltWorld(workerThreads: 0);
+        final box = JoltShape.box(Vector3(0.3, 0.3, 0.3));
+        final boxId = world.createBody(
+          box,
+          JoltBodySettings(
+            motionType: JoltMotionType.static_,
+            position: Vector3(0, 0.3, 0),
+          ),
+        );
+        box.release();
+        world.setBodyOwner(boxId, 5);
+        world.setBodyClothCollider(boxId, collider);
+        final (v, t) = grid(9, 1.0);
+        final cloth = world.createCloth(
+          v,
+          t,
+          position: Vector3(0, 1.0, 0),
+          settings: JoltClothSettings(tethers: JoltClothTethers.none),
+        );
+        world.setBodyOwner(cloth, 5);
+        for (var i = 0; i < 120; i++) {
+          world.step(1 / 120);
+        }
+        final p = world.clothVertices(cloth);
+        final centre = at(p, 40);
+        if (collider) {
+          expect(centre.y, greaterThan(0.55), reason: 'rests on its collider');
+        } else {
+          expect(
+            centre.y,
+            lessThan(0.0),
+            reason: 'falls through the box of its owner',
+          );
+        }
+        world.dispose();
+      }
+    },
+  );
 }

@@ -676,8 +676,10 @@ external void jolt_soft_body_set_vertex(
   double inverse_mass,
 );
 
-/// Wind: pulls every free vertex's velocity toward wind3 (m/s) by
-/// drag * dt (a fraction per second), and wakes the body.
+/// Wind (aerodynamic): every face is pushed along its normal by the part of
+/// the wind velocity wind3 (m/s, relative to the face) that hits it, at
+/// drag * dt (a fraction per second); a face edge-on to the wind feels
+/// nothing. Wakes the body.
 @ffi.Native<
   ffi.Void Function(
     ffi.Pointer<JoltWorld>,
@@ -750,6 +752,69 @@ external void jolt_soft_body_set_inverse_mass(
   int body,
   int index,
   double inverse_mass,
+);
+
+/// A cloth (as jolt_soft_body_create) whose vertices are skinned to joints:
+/// each vertex stays within its max distance of where the skeleton puts it.
+/// Call jolt_soft_body_skin with hard_skin_all once after creating it.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<JoltClothSettings>,
+    ffi.Pointer<JoltClothSkin>,
+    ffi.Uint64,
+  )
+>(isLeaf: true)
+external int jolt_skinned_cloth_create(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> positions,
+  ffi.Pointer<ffi.Float> inverse_masses,
+  int vertex_count,
+  ffi.Pointer<ffi.Uint32> indices,
+  int index_count,
+  ffi.Pointer<ffi.Float> position3,
+  ffi.Pointer<ffi.Float> rotation4,
+  ffi.Pointer<JoltClothSettings> settings,
+  ffi.Pointer<JoltClothSkin> skin,
+  int user_data,
+);
+
+/// Poses a skinned cloth's skeleton: count column-major 4x4 joint matrices in
+/// the world (metres). hard_skin_all puts every vertex on its skinned
+/// position (a reset or a teleport).
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+    ffi.Bool,
+  )
+>(isLeaf: true)
+external void jolt_soft_body_skin(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> joint_world16,
+  int count,
+  bool hard_skin_all,
+);
+
+/// A body a cloth of the same owner collides with (a character's limb
+/// capsules for its garment); other bodies of the cloth's owner are ignored.
+@ffi.Native<ffi.Void Function(ffi.Pointer<JoltWorld>, ffi.Uint32, ffi.Bool)>(
+  isLeaf: true,
+)
+external void jolt_body_set_cloth_collider(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  bool cloth_collider,
 );
 
 @ffi.Native<
@@ -1096,6 +1161,30 @@ final class JoltClothSettings extends ffi.Struct {
 
   @ffi.Bool()
   external bool double_sided;
+}
+
+/// Skinning of a cloth to a skeleton (a garment on a character). Frames are
+/// the soft body's creation frame (its position / rotation), in metres.
+final class JoltClothSkin extends ffi.Struct {
+  /// joint_count column-major 4x4 matrices: each joint's bind pose inverted.
+  external ffi.Pointer<ffi.Float> inverse_binds;
+
+  @ffi.Uint32()
+  external int joint_count;
+
+  /// Four joints and weights per vertex (a weight of 0 ends a vertex's list).
+  external ffi.Pointer<ffi.Uint32> joints;
+
+  external ffi.Pointer<ffi.Float> weights;
+
+  /// Per vertex: how far (m) it may move from its skinned position (0 hard
+  /// skins it), and the backstop distance behind it (>= max distance: none).
+  external ffi.Pointer<ffi.Float> max_distances;
+
+  external ffi.Pointer<ffi.Float> backstop_distances;
+
+  @ffi.Float()
+  external double backstop_radius;
 }
 
 /// A ball-and-socket joint with a swing cone and a twist range. Frames are in

@@ -35,6 +35,7 @@
 #include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/SoftBody/SoftBodyContactListener.h>
 #include <Jolt/Physics/SoftBody/SoftBodyCreationSettings.h>
 #include <Jolt/Physics/SoftBody/SoftBodyMotionProperties.h>
 #include <Jolt/Physics/SoftBody/SoftBodySharedSettings.h>
@@ -145,6 +146,7 @@ struct BodyData {
   bool used = false;
   uint64 owner = 0;
   bool collidesWithOwner = false;
+  bool clothCollider = false;
   std::vector<uint16> profiles;
   float friction = 0.7f;
   float staticFriction = 0.7f;
@@ -280,7 +282,7 @@ struct JoltConstraint {
   bool hinge = false;
 };
 
-struct JoltWorld : public ContactListener, public SimShapeFilter {
+struct JoltWorld : public ContactListener, public SimShapeFilter, public SoftBodyContactListener {
   std::unique_ptr<TempAllocatorImpl> temp;
   std::unique_ptr<JobSystem> jobs;
   // The thread steps run on; stopped first in jolt_world_destroy.
@@ -323,7 +325,8 @@ struct JoltWorld : public ContactListener, public SimShapeFilter {
     const BodyData* a = find(body1);
     const BodyData* b = find(body2);
     if (a != nullptr && b != nullptr) {
-      if (a->owner != 0 && a->owner == b->owner) {
+      // Soft bodies decide about their owner in OnSoftBodyContactValidate.
+      if (a->owner != 0 && a->owner == b->owner && !body1.IsSoftBody() && !body2.IsSoftBody()) {
         const bool bothBodies = !body1.IsStatic() && !body2.IsStatic();
         if (!(bothBodies && a->collidesWithOwner && b->collidesWithOwner)) return false;
       }
@@ -381,6 +384,18 @@ struct JoltWorld : public ContactListener, public SimShapeFilter {
     contacts.push_back(c);
   }
 
+  // A cloth ignores the other bodies of its owner (a character's own
+  // capsule) except those marked as its colliders (the limb capsules).
+  SoftBodyValidateResult OnSoftBodyContactValidate(const Body& softBody, const Body& other,
+                                                   SoftBodyContactSettings&) override {
+    const BodyData* a = find(softBody);
+    const BodyData* b = find(other);
+    if (a != nullptr && b != nullptr && a->owner != 0 && a->owner == b->owner && !b->clothCollider) {
+      return SoftBodyValidateResult::RejectContact;
+    }
+    return SoftBodyValidateResult::AcceptContact;
+  }
+
   void OnContactAdded(const Body& body1, const Body& body2, const ContactManifold& manifold,
                       ContactSettings& settings) override {
     settle(body1, body2, manifold, settings, false);
@@ -430,6 +445,7 @@ JoltWorld* jolt_world_create(const JoltWorldSettings* settings) {
   w->system.Init(maxBodies, 0, maxPairs, maxContacts, w->layers, w->objectVsBroadPhase, w->objectPair);
   w->system.SetContactListener(w);
   w->system.SetSimShapeFilter(w);
+  w->system.SetSoftBodyContactListener(w);
   w->stepper = std::make_unique<Stepper>();
   return w;
 }
@@ -915,10 +931,10 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
   s->double_sided = true;
 }
 
-uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+static uint32_t createSoftBody(JoltWorld* world, const float* positions, const float* inverse_masses,
                                uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
                                const float* position3, const float* rotation4, const JoltClothSettings* s,
-                               uint64_t user_data) {
+                               const JoltClothSkin* skin, uint64_t user_data) {
   if (vertex_count < 3 || index_count < 3) return BodyID::cInvalidBodyID;
   Ref<SoftBodySharedSettings> shared = new SoftBodySharedSettings();
   shared->mVertices.reserve(vertex_count);
@@ -946,6 +962,30 @@ uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const f
                                                  : s->bend_type == 1 ? SoftBodySharedSettings::EBendType::Distance
                                                                      : SoftBodySharedSettings::EBendType::None;
   shared->CreateConstraints(&attributes, 1, bend);
+  if (skin != nullptr && skin->joint_count > 0) {
+    for (uint32_t j = 0; j < skin->joint_count; ++j) {
+      const float* m = skin->inverse_binds + 16 * j;
+      shared->mInvBindMatrices.push_back(SoftBodySharedSettings::InvBind(
+          j, Mat44(Vec4(m[0], m[1], m[2], m[3]), Vec4(m[4], m[5], m[6], m[7]), Vec4(m[8], m[9], m[10], m[11]),
+                   Vec4(m[12], m[13], m[14], m[15]))));
+    }
+    for (uint32_t i = 0; i < vertex_count; ++i) {
+      SoftBodySharedSettings::Skinned skinned(i, std::max(0.0f, skin->max_distances[i]),
+                                              skin->backstop_distances != nullptr ? skin->backstop_distances[i] : FLT_MAX,
+                                              skin->backstop_radius);
+      uint32_t used = 0;
+      for (uint32_t k = 0; k < 4; ++k) {
+        const float w = skin->weights[4 * i + k];
+        const uint32_t joint = skin->joints[4 * i + k];
+        if (w <= 0.0f || joint >= skin->joint_count) continue;
+        skinned.mWeights[used++] = SoftBodySharedSettings::SkinWeight(joint, w);
+      }
+      if (used == 0) continue;
+      skinned.NormalizeWeights();
+      shared->mSkinnedConstraints.push_back(skinned);
+    }
+    shared->CalculateSkinnedConstraintNormals();
+  }
   shared->Optimize();
 
   SoftBodyCreationSettings settings(shared, RVec3(vec3(position3)), quat(rotation4), Layers::kMoving);
@@ -967,6 +1007,22 @@ uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const f
   d = BodyData();
   d.used = true;
   return id.GetIndexAndSequenceNumber();
+}
+
+uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+                               uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                               const float* position3, const float* rotation4, const JoltClothSettings* s,
+                               uint64_t user_data) {
+  return createSoftBody(world, positions, inverse_masses, vertex_count, indices, index_count, position3, rotation4, s,
+                        nullptr, user_data);
+}
+
+uint32_t jolt_skinned_cloth_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+                                   uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                                   const float* position3, const float* rotation4, const JoltClothSettings* s,
+                                   const JoltClothSkin* skin, uint64_t user_data) {
+  return createSoftBody(world, positions, inverse_masses, vertex_count, indices, index_count, position3, rotation4, s,
+                        skin, user_data);
 }
 
 static SoftBodyMotionProperties* softBody(Body& body) {
@@ -1097,6 +1153,32 @@ uint32_t jolt_soft_body_get_local_vertices(JoltWorld* world, uint32_t body, cons
     store(nrm, out_normals + 3 * i);
   }
   return n;
+}
+
+void jolt_soft_body_skin(JoltWorld* world, uint32_t body, const float* joint_world16, uint32_t count,
+                         bool hard_skin_all) {
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    Body& b = lock.GetBody();
+    SoftBodyMotionProperties* mp = softBody(b);
+    if (mp == nullptr || count == 0) return;
+    const RMat44 com = b.GetCenterOfMassTransform();
+    const Mat44 offset = com.InversedRotationTranslation();
+    std::vector<Mat44> pose(count);
+    for (uint32_t i = 0; i < count; ++i) {
+      const float* m = joint_world16 + 16 * i;
+      pose[i] = offset * Mat44(Vec4(m[0], m[1], m[2], m[3]), Vec4(m[4], m[5], m[6], m[7]),
+                               Vec4(m[8], m[9], m[10], m[11]), Vec4(m[12], m[13], m[14], m[15]));
+    }
+    mp->SetEnableSkinConstraints(true);
+    mp->SkinVertices(com, pose.data(), count, hard_skin_all, *world->temp);
+  }
+  bodies(world).ActivateBody(bodyId(body));
+}
+
+void jolt_body_set_cloth_collider(JoltWorld* world, uint32_t body, bool cloth_collider) {
+  world->data(bodyId(body)).clothCollider = cloth_collider;
 }
 
 void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index, float inverse_mass) {

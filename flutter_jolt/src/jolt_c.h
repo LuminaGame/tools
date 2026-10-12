@@ -331,6 +331,39 @@ JOLT_C_EXPORT uint32_t jolt_soft_body_get_local_vertices(JoltWorld* world, uint3
 JOLT_C_EXPORT void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index,
                                                    float inverse_mass);
 
+/// Skinning of a cloth to a skeleton (a garment on a character). Frames are
+/// the soft body's creation frame (its position / rotation), in metres.
+typedef struct JoltClothSkin {
+  /// joint_count column-major 4x4 matrices: each joint's bind pose inverted.
+  const float* inverse_binds;
+  uint32_t joint_count;
+  /// Four joints and weights per vertex (a weight of 0 ends a vertex's list).
+  const uint32_t* joints;
+  const float* weights;
+  /// Per vertex: how far (m) it may move from its skinned position (0 hard
+  /// skins it), and the backstop distance behind it (>= max distance: none).
+  const float* max_distances;
+  const float* backstop_distances;
+  float backstop_radius;
+} JoltClothSkin;
+
+/// A cloth (as jolt_soft_body_create) whose vertices are skinned to joints:
+/// each vertex stays within its max distance of where the skeleton puts it.
+/// Call jolt_soft_body_skin with hard_skin_all once after creating it.
+JOLT_C_EXPORT uint32_t jolt_skinned_cloth_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+                                                 uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                                                 const float* position3, const float* rotation4,
+                                                 const JoltClothSettings* settings, const JoltClothSkin* skin,
+                                                 uint64_t user_data);
+/// Poses a skinned cloth's skeleton: count column-major 4x4 joint matrices in
+/// the world (metres). hard_skin_all puts every vertex on its skinned
+/// position (a reset or a teleport).
+JOLT_C_EXPORT void jolt_soft_body_skin(JoltWorld* world, uint32_t body, const float* joint_world16, uint32_t count,
+                                       bool hard_skin_all);
+/// A body a cloth of the same owner collides with (a character's limb
+/// capsules for its garment); other bodies of the cloth's owner are ignored.
+JOLT_C_EXPORT void jolt_body_set_cloth_collider(JoltWorld* world, uint32_t body, bool cloth_collider);
+
 // --- Constraints --------------------------------------------------------------
 
 /// A ball-and-socket joint with a swing cone and a twist range. Frames are in
