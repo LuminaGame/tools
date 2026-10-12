@@ -9,6 +9,7 @@ Documentation: [docs/README.md](docs/README.md).
 | Package | What it is |
 |---|---|
 | [`flutter_assimp`](flutter_assimp/) | Dart FFI bindings to [Assimp](https://github.com/assimp/assimp): converts FBX, OBJ, Collada, 3DS, PLY, DirectX and STL to glTF 2.0 binary (GLB). Builds the bundled Assimp sources, or links the Assimp library of a Filament build. |
+| [`flutter_jolt`](flutter_jolt/) | Dart FFI bindings to [Jolt Physics](https://github.com/jrouwe/JoltPhysics): a native physics world with rigid bodies, shapes, constraints, contacts and ray casts. The engine's physics backend on native desktop. |
 | [`flutter_kimodo`](flutter_kimodo/) | Dart FFI bindings to [kimodo.cpp](https://github.com/localai-org/kimodo.cpp): NVIDIA Kimodo text-to-motion generation (GGUF weights, CPU and Vulkan) on a background isolate. |
 | [`flutter_riglogic`](flutter_riglogic/) | Dart FFI bindings to Epic Games' [OpenRigLogic](https://github.com/EpicGames/openriglogic): reads MetaHuman `.dna` files and evaluates facial rigs. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Pure-Dart FFI bindings to a system GStreamer 1.x install, loaded at run time: pipelines, VP8/WebM encoding from PNG or RGBA frames, media probing. The engine's smoke tests record their videos with it. |
@@ -21,7 +22,7 @@ Related repositories: [lumina](https://github.com/LuminaGame/lumina) (engine and
 
 - Flutter SDK with Dart `^3.12.0`.
 - [melos](https://melos.invertase.dev/) 7 for the workspace scripts (a dev dependency of the root pubspec; `dart pub global activate melos` puts `melos` on the PATH, or use `dart run melos`).
-- For the native packages (`flutter_assimp`, `flutter_riglogic`):
+- For the native packages (`flutter_assimp`, `flutter_riglogic`, `flutter_jolt`):
   - **Linux**: clang (and zlib headers); the bundled libc++ that ships in the lumina repo under `flutter_filament/third_party/libcxx` is used when present.
   - **Windows**: Visual Studio 2022 with the C++ workload (MSVC); CMake and Ninja only for the optional prebuilt OpenRigLogic library.
   - Optional: a prebuilt **Google Filament** (with the local patches documented in the lumina repo) for `flutter_assimp`; without one the hook compiles the bundled Assimp sources.
@@ -72,6 +73,17 @@ flutter_riglogic\tool\build_openriglogic_android.bat [abi]    # Android (Windows
 bash flutter_riglogic/tool/build_openriglogic_android.sh [abi]# Android (Linux host)   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
 ```
 
+### Jolt Physics
+
+`flutter_jolt` links a Jolt Physics static library built from the release pinned in `flutter_jolt/tool/jolt_version.txt` (Jolt is fetched, not vendored; the folder is gitignored). Without it the package builds no native library and `JoltPhysics.isAvailable` is false, so the engine uses its Dart physics:
+
+```bash
+flutter_jolt\tool\build_jolt.bat          # Windows (VS 2022, CMake/Ninja from VS) -> third_party\jolt\{include,lib\Jolt.lib,jolt_defines.txt}
+bash flutter_jolt/tool/build_jolt.sh       # Linux (clang, bundled libc++)           -> third_party/jolt/{include,lib/libJolt.a,jolt_defines.txt}
+```
+
+See [docs/en/flutter_jolt.md](docs/en/flutter_jolt.md).
+
 ### kimodo.cpp
 
 `flutter_kimodo` bundles a prebuilt kimodo.cpp (kimodo + ggml shared libraries) built from the commit pinned in `flutter_kimodo/tool/kimodo/UPSTREAM`:
@@ -93,6 +105,7 @@ The native-assets hooks of `flutter_assimp` and `flutter_riglogic` read their pa
 | `filament_dir` | flutter_assimp | `LUMINA_FILAMENT_DIR` | `<package>/../filament` (this repository's `filament/` link) |
 | `libcxx_dir` (Linux) | both | `LUMINA_LIBCXX_DIR` | `<package>/../../lumina/flutter_filament/third_party/libcxx` |
 | `riglogic_lib_dir` | flutter_riglogic | `LUMINA_RIGLOGIC_LIB_DIR` | `<package>/third_party/openriglogic/lib` |
+| `jolt_dir` | flutter_jolt | `LUMINA_JOLT_DIR` | `<package>/third_party/jolt` |
 | `kimodo_dir` | flutter_kimodo | `LUMINA_KIMODO_DIR` | `<package>/third_party/kimodo/prebuilt/<VERSION>/<os>-x64` |
 
 This repository's root pubspec sets `flutter_assimp: filament_dir: filament`.

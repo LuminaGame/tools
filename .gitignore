@@ -36,3 +36,4 @@ windows/packaging/dev/
 # OS
 .DS_Store
 Thumbs.db
+flutter_jolt/third_party/jolt/

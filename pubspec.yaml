@@ -9,6 +9,7 @@ environment:
 workspace:
   - flutter_assimp
   - flutter_gstreamer
+  - flutter_jolt
   - flutter_kimodo
   - flutter_riglogic
   - flutter_riglogic/example

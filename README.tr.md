@@ -9,6 +9,7 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 | Paket | Ne işe yarar |
 |---|---|
 | [`flutter_assimp`](flutter_assimp/) | [Assimp](https://github.com/assimp/assimp) için Dart FFI binding'leri: FBX, OBJ, Collada, 3DS, PLY, DirectX ve STL'yi glTF 2.0 binary'ye (GLB) çevirir. Paketle gelen Assimp kaynaklarını derler ya da bir Filament build'inin Assimp kütüphanesini link eder. |
+| [`flutter_jolt`](flutter_jolt/) | [Jolt Physics](https://github.com/jrouwe/JoltPhysics) için Dart FFI binding'leri: rigid body'ler, şekiller, constraint'ler, temaslar ve ray cast'lerle native bir fizik dünyası. Motorun native masaüstündeki fizik backend'i. |
 | [`flutter_kimodo`](flutter_kimodo/) | [kimodo.cpp](https://github.com/localai-org/kimodo.cpp) için Dart FFI binding'leri: NVIDIA Kimodo ile metinden hareket üretimi (GGUF ağırlıklar, CPU ve Vulkan), arka plan isolate'inde. |
 | [`flutter_riglogic`](flutter_riglogic/) | Epic Games'in [OpenRigLogic](https://github.com/EpicGames/openriglogic) kütüphanesi için Dart FFI binding'leri: MetaHuman `.dna` dosyalarını okur ve yüz rig'lerini hesaplar. |
 | [`flutter_gstreamer`](flutter_gstreamer/) | Sistemde kurulu GStreamer 1.x için saf Dart FFI binding'leri, run time'da yüklenir: pipeline'lar, PNG ya da RGBA frame'lerden VP8/WebM encode, media probe. Engine'in smoke test'leri videolarını bununla kaydeder. |
@@ -21,7 +22,7 @@ Dokümantasyon: [docs/README.tr.md](docs/README.tr.md).
 
 - Dart `^3.12.0` içeren Flutter SDK.
 - Workspace script'leri için [melos](https://melos.invertase.dev/) 7 (root pubspec'te dev dependency; `dart pub global activate melos` ile `melos` PATH'e girer, ya da `dart run melos` kullanın).
-- Native paketler (`flutter_assimp`, `flutter_riglogic`) için:
+- Native paketler (`flutter_assimp`, `flutter_riglogic`, `flutter_jolt`) için:
   - **Linux**: clang (ve zlib header'ları); lumina repo'sunda `flutter_filament/third_party/libcxx` altında gelen bundled libc++ varsa o kullanılır.
   - **Windows**: C++ workload'u kurulu Visual Studio 2022 (MSVC); CMake ve Ninja yalnızca isteğe bağlı prebuilt OpenRigLogic kütüphanesi için.
   - İsteğe bağlı: `flutter_assimp` için prebuilt **Google Filament** (lumina repo'sunda anlatılan local patch'lerle); yoksa hook paketle gelen Assimp kaynaklarını derler.
@@ -72,6 +73,17 @@ flutter_riglogic\tool\build_openriglogic_android.bat [abi]    # Android (Windows
 bash flutter_riglogic/tool/build_openriglogic_android.sh [abi]# Android (Linux host)   -> third_party/openriglogic/lib/android/<abi>/libriglogic.a
 ```
 
+### Jolt Physics
+
+`flutter_jolt`, `flutter_jolt/tool/jolt_version.txt` içinde sabitlenen sürümden build edilen static bir Jolt Physics kütüphanesini link eder (Jolt vendored değildir, indirilir; klasör gitignore'dadır). Kütüphane yoksa paket native kütüphane üretmez ve `JoltPhysics.isAvailable` false olur; motor o zaman Dart fiziğini kullanır:
+
+```bash
+flutter_jolt\tool\build_jolt.bat          # Windows (VS 2022, VS'in CMake/Ninja'sı) -> third_party\jolt\{include,lib\Jolt.lib,jolt_defines.txt}
+bash flutter_jolt/tool/build_jolt.sh       # Linux (clang, paketli libc++)           -> third_party/jolt/{include,lib/libJolt.a,jolt_defines.txt}
+```
+
+Bkz. [docs/tr/flutter_jolt.md](docs/tr/flutter_jolt.md).
+
 ### kimodo.cpp
 
 `flutter_kimodo`, `flutter_kimodo/tool/kimodo/UPSTREAM` dosyasında sabitlenen commit'ten build edilen hazır bir kimodo.cpp (kimodo + ggml paylaşımlı kütüphaneleri) paketler:
@@ -93,6 +105,7 @@ Ayrıntılar: [docs/tr/flutter_kimodo.md](docs/tr/flutter_kimodo.md).
 | `filament_dir` | flutter_assimp | `LUMINA_FILAMENT_DIR` | `<paket>/../filament` (bu repo'nun `filament/` link'i) |
 | `libcxx_dir` (Linux) | ikisi de | `LUMINA_LIBCXX_DIR` | `<paket>/../../lumina/flutter_filament/third_party/libcxx` |
 | `riglogic_lib_dir` | flutter_riglogic | `LUMINA_RIGLOGIC_LIB_DIR` | `<paket>/third_party/openriglogic/lib` |
+| `jolt_dir` | flutter_jolt | `LUMINA_JOLT_DIR` | `<paket>/third_party/jolt` |
 
 Bu repo'nun root pubspec'i `flutter_assimp: filament_dir: filament` ayarını yapar.
 
