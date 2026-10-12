@@ -304,6 +304,10 @@ JOLT_C_EXPORT JoltConstraint* jolt_constraint_hinge(JoltWorld* world, uint32_t b
 JOLT_C_EXPORT void jolt_constraint_destroy(JoltWorld* world, JoltConstraint* constraint);
 JOLT_C_EXPORT void jolt_constraint_set_enabled(JoltConstraint* constraint, bool enabled);
 JOLT_C_EXPORT void jolt_constraint_set_max_friction_torque(JoltConstraint* constraint, float torque);
+/// Solver iterations for the island this constraint is in (0 = the world's
+/// setting); the island uses the largest override of its constraints.
+JOLT_C_EXPORT void jolt_constraint_set_solver_steps(JoltConstraint* constraint, uint32_t velocity_steps,
+                                                    uint32_t position_steps);
 /// Swing-twist: cone and twist limits. Hinge: limit_min / limit_max are
 /// twist_min / twist_max, the cones are ignored.
 JOLT_C_EXPORT void jolt_constraint_set_limits(JoltConstraint* constraint, float normal_half_cone,
@@ -313,6 +317,12 @@ JOLT_C_EXPORT void jolt_constraint_set_limits(JoltConstraint* constraint, float 
 /// its x) with at most max_torque (N m). max_torque <= 0 switches it off.
 JOLT_C_EXPORT void jolt_constraint_set_velocity_motor(JoltConstraint* constraint, const float* angular_velocity3,
                                                       float max_torque);
+/// Position motor: a spring of frequency (Hz) and damping ratio pulls body
+/// B's joint frame toward target4 (xyzw, B's frame in A's frame; a hinge
+/// reads the angle about X, its hinge axis in that frame) with at most max_torque (N m).
+/// max_torque <= 0 switches it off.
+JOLT_C_EXPORT void jolt_constraint_set_position_motor(JoltConstraint* constraint, const float* target4,
+                                                      float frequency, float damping, float max_torque);
 /// The accumulated position and rotation impulse magnitudes of the last
 /// step (for breakable joints and diagnostics).
 JOLT_C_EXPORT void jolt_constraint_get_lambdas(JoltConstraint* constraint, float* out2);

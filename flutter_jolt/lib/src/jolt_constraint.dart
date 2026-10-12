@@ -146,6 +146,10 @@ class JoltConstraint {
   set maxFrictionTorque(double torque) =>
       b.jolt_constraint_set_max_friction_torque(_h, torque);
 
+  /// Solver iterations for this constraint's island (0: the world's).
+  void setSolverSteps({int velocity = 0, int position = 0}) =>
+      b.jolt_constraint_set_solver_steps(_h, velocity, position);
+
   /// Swing-twist: cones and twist range. Hinge: [twistMin] / [twistMax] are
   /// its limits.
   void setLimits({
@@ -169,6 +173,24 @@ class JoltConstraint {
     _f[1] = angularVelocity.y;
     _f[2] = angularVelocity.z;
     b.jolt_constraint_set_velocity_motor(_h, _f, maxTorque);
+  }
+
+  /// Pulls body B's joint frame toward [target] (B's frame in A's frame; a
+  /// hinge uses the angle about X, the hinge axis of that frame) with a spring
+  /// of [frequency] Hz and
+  /// [damping] ratio, at most [maxTorque] (N m); [maxTorque] <= 0 switches
+  /// the motor off.
+  void setPositionMotor(
+    Quaternion target, {
+    required double frequency,
+    double damping = 1.0,
+    required double maxTorque,
+  }) {
+    _f[0] = target.x;
+    _f[1] = target.y;
+    _f[2] = target.z;
+    _f[3] = target.w;
+    b.jolt_constraint_set_position_motor(_h, _f, frequency, damping, maxTorque);
   }
 
   /// The position and rotation-limit impulses of the last step.

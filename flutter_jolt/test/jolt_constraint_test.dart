@@ -148,6 +148,52 @@ void main() {
     },
   );
 
+  test(
+    'a position motor holds a hinged rod at 30 degrees against gravity; switched off, the rod falls',
+    () {
+      final r = rod();
+      final c = world.addHinge(
+        anchor,
+        r,
+        JoltHingeSettings(
+          positionA: Vector3.zero(),
+          hingeAxisA: Vector3(0, 0, 1),
+          normalAxisA: Vector3(1, 0, 0),
+          positionB: Vector3(-0.5, 0, 0),
+          hingeAxisB: Vector3(0, 0, 1),
+          normalAxisB: Vector3(1, 0, 0),
+        ),
+      );
+      c.setSolverSteps(velocity: 20, position: 10);
+      // 30 degrees about the hinge axis (a hinge target turns about X, the
+      // hinge axis of its frame): the rod points 30 degrees up.
+      c.setPositionMotor(
+        Quaternion.axisAngle(Vector3(1, 0, 0), math.pi / 6),
+        frequency: 10,
+        maxTorque: 1000,
+      );
+      for (var i = 0; i < 240; i++) {
+        world.step(1 / 120);
+      }
+      final d = tipDirection(r);
+      expect(math.atan2(d.y, d.x) * 180 / math.pi, closeTo(30, 3));
+      c.setPositionMotor(Quaternion.identity(), frequency: 0, maxTorque: 0);
+      // A motor change does not wake a sleeping body.
+      world.activateBody(r);
+      // Undamped, it swings down like a pendulum.
+      var lowest = 1.0;
+      for (var i = 0; i < 120; i++) {
+        world.step(1 / 120);
+        lowest = math.min(lowest, tipDirection(r).y);
+      }
+      expect(
+        lowest,
+        lessThan(-0.9),
+        reason: 'swings down once the motor is off',
+      );
+    },
+  );
+
   test('destroying a body removes its constraints first', () {
     final r = rod();
     world.addSwingTwist(

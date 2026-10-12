@@ -651,6 +651,17 @@ external void jolt_constraint_set_max_friction_torque(
   double torque,
 );
 
+/// Solver iterations for the island this constraint is in (0 = the world's
+/// setting); the island uses the largest override of its constraints.
+@ffi.Native<
+  ffi.Void Function(ffi.Pointer<JoltConstraint>, ffi.Uint32, ffi.Uint32)
+>(isLeaf: true)
+external void jolt_constraint_set_solver_steps(
+  ffi.Pointer<JoltConstraint> constraint,
+  int velocity_steps,
+  int position_steps,
+);
+
 /// Swing-twist: cone and twist limits. Hinge: limit_min / limit_max are
 /// twist_min / twist_max, the cones are ignored.
 @ffi.Native<
@@ -683,6 +694,27 @@ external void jolt_constraint_set_limits(
 external void jolt_constraint_set_velocity_motor(
   ffi.Pointer<JoltConstraint> constraint,
   ffi.Pointer<ffi.Float> angular_velocity3,
+  double max_torque,
+);
+
+/// Position motor: a spring of frequency (Hz) and damping ratio pulls body
+/// B's joint frame toward target4 (xyzw, B's frame in A's frame; a hinge
+/// reads the angle about X, its hinge axis in that frame) with at most max_torque (N m).
+/// max_torque <= 0 switches it off.
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltConstraint>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Float,
+    ffi.Float,
+    ffi.Float,
+  )
+>(isLeaf: true)
+external void jolt_constraint_set_position_motor(
+  ffi.Pointer<JoltConstraint> constraint,
+  ffi.Pointer<ffi.Float> target4,
+  double frequency,
+  double damping,
   double max_torque,
 );
 
@@ -782,7 +814,8 @@ final class JoltBodySettings extends ffi.Struct {
   external double gravity_factor;
 
   /// > 0: mass (kg) and inertia (kg m^2, 3x3 row major about the centre of
-  /// mass, body axes) replace the ones Jolt computes from the shape.
+  /// mass, body axes) replace the ones Jolt computes from the shape. An
+  /// all-zero inertia diagonal keeps the shape's inertia scaled to the mass.
   @ffi.Float()
   external double mass;
 

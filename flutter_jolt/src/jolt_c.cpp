@@ -845,6 +845,11 @@ void jolt_constraint_set_max_friction_torque(JoltConstraint* constraint, float t
   }
 }
 
+void jolt_constraint_set_solver_steps(JoltConstraint* constraint, uint32_t velocity_steps, uint32_t position_steps) {
+  constraint->constraint->SetNumVelocityStepsOverride(std::min<uint32_t>(velocity_steps, 255));
+  constraint->constraint->SetNumPositionStepsOverride(std::min<uint32_t>(position_steps, 255));
+}
+
 void jolt_constraint_set_limits(JoltConstraint* constraint, float normal_half_cone, float plane_half_cone,
                                 float twist_min, float twist_max) {
   if (constraint->hinge) {
@@ -878,6 +883,32 @@ void jolt_constraint_set_velocity_motor(JoltConstraint* constraint, const float*
   s->SetSwingMotorState(on ? EMotorState::Velocity : EMotorState::Off);
   s->SetTwistMotorState(on ? EMotorState::Velocity : EMotorState::Off);
   if (on) s->SetTargetAngularVelocityCS(vec3(angular_velocity3));
+}
+
+void jolt_constraint_set_position_motor(JoltConstraint* constraint, const float* target4, float frequency,
+                                       float damping, float max_torque) {
+  const bool on = max_torque > 0.0f;
+  const Quat target = quat(target4);
+  if (constraint->hinge) {
+    auto* h = static_cast<HingeConstraint*>(constraint->constraint.GetPtr());
+    MotorSettings& m = h->GetMotorSettings();
+    m.mSpringSettings = SpringSettings(ESpringMode::FrequencyAndDamping, frequency, damping);
+    m.SetTorqueLimit(on ? max_torque : 0.0f);
+    h->SetMotorState(on ? EMotorState::Position : EMotorState::Off);
+    if (on) {
+      // The angle about the hinge (X) axis of the target rotation.
+      h->SetTargetAngle(2.0f * std::atan2(target.GetX(), target.GetW()));
+    }
+    return;
+  }
+  auto* s = static_cast<SwingTwistConstraint*>(constraint->constraint.GetPtr());
+  for (MotorSettings* m : {&s->GetSwingMotorSettings(), &s->GetTwistMotorSettings()}) {
+    m->mSpringSettings = SpringSettings(ESpringMode::FrequencyAndDamping, frequency, damping);
+    m->SetTorqueLimit(on ? max_torque : 0.0f);
+  }
+  s->SetSwingMotorState(on ? EMotorState::Position : EMotorState::Off);
+  s->SetTwistMotorState(on ? EMotorState::Position : EMotorState::Off);
+  if (on) s->SetTargetOrientationCS(target);
 }
 
 void jolt_constraint_get_lambdas(JoltConstraint* constraint, float* out2) {
