@@ -379,4 +379,50 @@ void main() {
       }
     },
   );
+  test(
+    'carrying a cloth along a motion moves its free vertices that far and leaves pinned ones',
+    () {
+      final world = JoltWorld(workerThreads: 1);
+      addTearDown(world.dispose);
+      final (v, t) = grid(5, 1.0);
+      final inv = [for (var i = 0; i < v.length; i++) i == 0 ? 0.0 : 1.0];
+      final cloth = world.createCloth(
+        v,
+        t,
+        inverseMasses: inv,
+        position: Vector3(0, 3, 0),
+      );
+      final before = Float32List.fromList(world.clothVertices(cloth));
+      // Turn 180 degrees about the vertical through (1, 0, 0), then go half way.
+      final delta = Matrix4.translation(Vector3(1, 0, 0))
+        ..rotateY(math.pi)
+        ..translateByVector3(Vector3(-1, 0, 0));
+      world.carryCloth(cloth, delta, 1);
+      final full = world.clothVertices(cloth);
+      expect(
+        at(full, 0).distanceTo(at(before, 0)),
+        lessThan(1e-5),
+        reason: 'pinned',
+      );
+      for (var i = 1; i < v.length; i++) {
+        expect(
+          at(full, i).distanceTo(delta.transform3(at(before, i))),
+          lessThan(1e-4),
+        );
+      }
+      world.carryCloth(cloth, Matrix4.translation(Vector3(0, 0, 2)), 0.25);
+      final quarter = world.clothVertices(cloth);
+      for (var i = 1; i < v.length; i++) {
+        expect(at(quarter, i).z - at(full, i).z, closeTo(0.5, 1e-4));
+      }
+      // A teleport takes the pinned vertex along too.
+      world.carryCloth(
+        cloth,
+        Matrix4.translation(Vector3(5, 0, 0)),
+        1,
+        includePinned: true,
+      );
+      expect(world.clothVertices(cloth)[0] - quarter[0], closeTo(5, 1e-4));
+    },
+  );
 }

@@ -743,6 +743,28 @@ external int jolt_soft_body_get_local_vertices(
   int max,
 );
 
+/// Carries a cloth along a rigid motion: delta16 (column-major 4x4, world,
+/// metres) moves every free vertex amount (0..1) of the way to where the
+/// motion takes it and turns its velocity as much (a character that moved
+/// or turned this step: 1 moves the cloth with it, 0 leaves it behind).
+/// include_pinned also moves the pinned vertices, all the way (a teleport).
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Float,
+    ffi.Bool,
+  )
+>(isLeaf: true)
+external void jolt_soft_body_carry(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> delta16,
+  double amount,
+  bool include_pinned,
+);
+
 /// Sets the inverse mass of vertex index (0 pins it where it is).
 @ffi.Native<
   ffi.Void Function(ffi.Pointer<JoltWorld>, ffi.Uint32, ffi.Uint32, ffi.Float)

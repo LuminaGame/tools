@@ -327,6 +327,13 @@ JOLT_C_EXPORT void jolt_soft_body_drive_vertices(JoltWorld* world, uint32_t body
 JOLT_C_EXPORT uint32_t jolt_soft_body_get_local_vertices(JoltWorld* world, uint32_t body,
                                                          const float* world_to_local16, float* out_positions,
                                                          float* out_normals, uint32_t max);
+/// Carries a cloth along a rigid motion: delta16 (column-major 4x4, world,
+/// metres) moves every free vertex amount (0..1) of the way to where the
+/// motion takes it and turns its velocity as much (a character that moved
+/// or turned this step: 1 moves the cloth with it, 0 leaves it behind).
+/// include_pinned also moves the pinned vertices, all the way (a teleport).
+JOLT_C_EXPORT void jolt_soft_body_carry(JoltWorld* world, uint32_t body, const float* delta16, float amount,
+                                        bool include_pinned);
 /// Sets the inverse mass of vertex index (0 pins it where it is).
 JOLT_C_EXPORT void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index,
                                                    float inverse_mass);

@@ -327,6 +327,27 @@ extension JoltWorldCloth on JoltWorld {
     }
   }
 
+  /// Carries a cloth along a rigid motion [delta] (world, metres): every free
+  /// vertex moves [amount] (0..1) of the way to where [delta] takes it and
+  /// its velocity turns as much. A character that moved or turned this step
+  /// takes its garment along by `1 − inertia`; 1 is a teleport.
+  /// [includePinned] moves the pinned vertices too (all the way).
+  void carryCloth(
+    int body,
+    Matrix4 delta,
+    double amount, {
+    bool includePinned = false,
+  }) {
+    if (amount <= 0) return;
+    final m = calloc<Float>(16);
+    try {
+      m.asTypedList(16).setAll(0, delta.storage);
+      b.jolt_soft_body_carry(handle, body, m, amount, includePinned);
+    } finally {
+      calloc.free(m);
+    }
+  }
+
   /// Pins vertex [index] where it is ([inverseMass] 0) or frees it.
   void setClothInverseMass(int body, int index, double inverseMass) =>
       b.jolt_soft_body_set_inverse_mass(handle, body, index, inverseMass);

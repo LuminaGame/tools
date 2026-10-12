@@ -1181,6 +1181,34 @@ void jolt_body_set_cloth_collider(JoltWorld* world, uint32_t body, bool cloth_co
   world->data(bodyId(body)).clothCollider = cloth_collider;
 }
 
+void jolt_soft_body_carry(JoltWorld* world, uint32_t body, const float* m, float amount, bool include_pinned) {
+  if (!(amount > 0.0f)) return;
+  amount = std::min(amount, 1.0f);
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    Body& b = lock.GetBody();
+    SoftBodyMotionProperties* mp = softBody(b);
+    if (mp == nullptr) return;
+    const Mat44 com = Mat44(b.GetCenterOfMassTransform());
+    const Mat44 delta(Vec4(m[0], m[1], m[2], m[3]), Vec4(m[4], m[5], m[6], m[7]), Vec4(m[8], m[9], m[10], m[11]),
+                      Vec4(m[12], m[13], m[14], m[15]));
+    // The motion in the body frame, where the vertices live.
+    const Mat44 local = com.InversedRotationTranslation() * delta * com;
+    const uint32_t n = uint32_t(mp->GetVertices().size());
+    for (uint32_t i = 0; i < n; ++i) {
+      SoftBodyVertex& v = mp->GetVertex(i);
+      if (v.mInvMass <= 0.0f) {
+        if (include_pinned) v.mPosition = local * v.mPosition;
+        continue;
+      }
+      v.mPosition += (local * v.mPosition - v.mPosition) * amount;
+      v.mVelocity += (local.Multiply3x3(v.mVelocity) - v.mVelocity) * amount;
+    }
+  }
+  bodies(world).ActivateBody(bodyId(body));
+}
+
 void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index, float inverse_mass) {
   {
     BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
