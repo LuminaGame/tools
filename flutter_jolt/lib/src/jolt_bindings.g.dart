@@ -597,6 +597,104 @@ external bool jolt_world_cast_ray(
   ffi.Pointer<JoltRayHit> out,
 );
 
+/// Fills settings with cloth defaults (stiff edges, soft dihedral bend,
+/// Euclidean long range attachments, 8 iterations).
+@ffi.Native<ffi.Void Function(ffi.Pointer<JoltClothSettings>)>(isLeaf: true)
+external void jolt_cloth_settings_init(ffi.Pointer<JoltClothSettings> settings);
+
+/// A cloth from vertex_count vertices (xyz triples in the body frame,
+/// metres), their inverse masses (0 = pinned) and index_count / 3 triangles,
+/// placed at position3 / rotation4. Returns the body id, or
+/// jolt_invalid_body_id().
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<JoltClothSettings>,
+    ffi.Uint64,
+  )
+>(isLeaf: true)
+external int jolt_soft_body_create(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> positions,
+  ffi.Pointer<ffi.Float> inverse_masses,
+  int vertex_count,
+  ffi.Pointer<ffi.Uint32> indices,
+  int index_count,
+  ffi.Pointer<ffi.Float> position3,
+  ffi.Pointer<ffi.Float> rotation4,
+  ffi.Pointer<JoltClothSettings> settings,
+  int user_data,
+);
+
+@ffi.Native<ffi.Uint32 Function(ffi.Pointer<JoltWorld>, ffi.Uint32)>(
+  isLeaf: true,
+)
+external int jolt_soft_body_vertex_count(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+);
+
+/// The vertices' world positions (3 floats each) into out; returns the count.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+  )
+>(isLeaf: true)
+external int jolt_soft_body_get_vertices(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> out,
+  int max,
+);
+
+/// Moves vertex index to world position3 with inverse_mass (0 pins it there,
+/// for a kinematic attachment; > 0 frees it), zeroing its velocity.
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Float,
+  )
+>(isLeaf: true)
+external void jolt_soft_body_set_vertex(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  int index,
+  ffi.Pointer<ffi.Float> position3,
+  double inverse_mass,
+);
+
+/// Wind: pulls every free vertex's velocity toward wind3 (m/s) by
+/// drag * dt (a fraction per second), and wakes the body.
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Float,
+    ffi.Float,
+  )
+>(isLeaf: true)
+external void jolt_soft_body_apply_wind(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> wind3,
+  double drag,
+  double dt,
+);
+
 @ffi.Native<
   ffi.Pointer<JoltConstraint> Function(
     ffi.Pointer<JoltWorld>,
@@ -885,6 +983,62 @@ final class JoltRayHit extends ffi.Struct {
 
   @ffi.Array.multi([3])
   external ffi.Array<ffi.Float> normal;
+}
+
+/// How a cloth soft body is built and simulated. Compliances are inverse
+/// stiffness (0 = rigid edges); a negative compliance disables that kind of
+/// constraint.
+final class JoltClothSettings extends ffi.Struct {
+  @ffi.Float()
+  external double edge_compliance;
+
+  @ffi.Float()
+  external double shear_compliance;
+
+  @ffi.Float()
+  external double bend_compliance;
+
+  @ffi.Int32()
+  external int bend_type;
+
+  @ffi.Int32()
+  external int lra_type;
+
+  @ffi.Float()
+  external double lra_max_distance_multiplier;
+
+  @ffi.Uint32()
+  external int iterations;
+
+  @ffi.Float()
+  external double linear_damping;
+
+  @ffi.Float()
+  external double max_linear_velocity;
+
+  @ffi.Float()
+  external double friction;
+
+  @ffi.Float()
+  external double restitution;
+
+  @ffi.Float()
+  external double pressure;
+
+  @ffi.Float()
+  external double vertex_radius;
+
+  @ffi.Float()
+  external double gravity_factor;
+
+  @ffi.Bool()
+  external bool update_position;
+
+  @ffi.Bool()
+  external bool allow_sleeping;
+
+  @ffi.Bool()
+  external bool double_sided;
 }
 
 /// A ball-and-socket joint with a swing cone and a twist range. Frames are in

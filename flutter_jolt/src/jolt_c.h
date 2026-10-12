@@ -263,6 +263,55 @@ typedef struct JoltRayHit {
 JOLT_C_EXPORT bool jolt_world_cast_ray(JoltWorld* world, const float* origin3, const float* direction3,
                                        JoltRayHit* out);
 
+// --- Soft bodies (cloth) ---------------------------------------------------------
+
+/// How a cloth soft body is built and simulated. Compliances are inverse
+/// stiffness (0 = rigid edges); a negative compliance disables that kind of
+/// constraint.
+typedef struct JoltClothSettings {
+  float edge_compliance;
+  float shear_compliance;
+  float bend_compliance;
+  int32_t bend_type;   // 0 none, 1 distance, 2 dihedral
+  int32_t lra_type;    // long range attachments to pinned vertices: 0 none, 1 Euclidean, 2 geodesic
+  float lra_max_distance_multiplier;
+  uint32_t iterations;
+  float linear_damping;
+  float max_linear_velocity;
+  float friction;
+  float restitution;
+  float pressure;
+  float vertex_radius;
+  float gravity_factor;
+  bool update_position;
+  bool allow_sleeping;
+  bool double_sided;
+} JoltClothSettings;
+
+/// Fills settings with cloth defaults (stiff edges, soft dihedral bend,
+/// Euclidean long range attachments, 8 iterations).
+JOLT_C_EXPORT void jolt_cloth_settings_init(JoltClothSettings* settings);
+
+/// A cloth from vertex_count vertices (xyz triples in the body frame,
+/// metres), their inverse masses (0 = pinned) and index_count / 3 triangles,
+/// placed at position3 / rotation4. Returns the body id, or
+/// jolt_invalid_body_id().
+JOLT_C_EXPORT uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+                                             uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                                             const float* position3, const float* rotation4,
+                                             const JoltClothSettings* settings, uint64_t user_data);
+JOLT_C_EXPORT uint32_t jolt_soft_body_vertex_count(JoltWorld* world, uint32_t body);
+/// The vertices' world positions (3 floats each) into out; returns the count.
+JOLT_C_EXPORT uint32_t jolt_soft_body_get_vertices(JoltWorld* world, uint32_t body, float* out, uint32_t max);
+/// Moves vertex index to world position3 with inverse_mass (0 pins it there,
+/// for a kinematic attachment; > 0 frees it), zeroing its velocity.
+JOLT_C_EXPORT void jolt_soft_body_set_vertex(JoltWorld* world, uint32_t body, uint32_t index, const float* position3,
+                                             float inverse_mass);
+/// Wind: pulls every free vertex's velocity toward wind3 (m/s) by
+/// drag * dt (a fraction per second), and wakes the body.
+JOLT_C_EXPORT void jolt_soft_body_apply_wind(JoltWorld* world, uint32_t body, const float* wind3, float drag,
+                                             float dt);
+
 // --- Constraints --------------------------------------------------------------
 
 /// A ball-and-socket joint with a swing cone and a twist range. Frames are in

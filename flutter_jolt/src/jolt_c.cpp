@@ -35,6 +35,9 @@
 #include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/SoftBody/SoftBodyCreationSettings.h>
+#include <Jolt/Physics/SoftBody/SoftBodyMotionProperties.h>
+#include <Jolt/Physics/SoftBody/SoftBodySharedSettings.h>
 #include <Jolt/RegisterTypes.h>
 
 #include <algorithm>
@@ -887,6 +890,140 @@ bool jolt_world_cast_ray(JoltWorld* world, const float* origin3, const float* di
     out->shape = 0;
   }
   return true;
+}
+
+// --- Soft bodies (cloth) ---------------------------------------------------------
+
+void jolt_cloth_settings_init(JoltClothSettings* s) {
+  std::memset(s, 0, sizeof(JoltClothSettings));
+  s->edge_compliance = 0.0f;
+  s->shear_compliance = 1.0e-5f;
+  s->bend_compliance = 1.0e-3f;
+  s->bend_type = 2;
+  s->lra_type = 1;
+  s->lra_max_distance_multiplier = 1.0f;
+  s->iterations = 8;
+  s->linear_damping = 0.1f;
+  s->max_linear_velocity = 100.0f;
+  s->friction = 0.5f;
+  s->restitution = 0.0f;
+  s->pressure = 0.0f;
+  s->vertex_radius = 0.01f;
+  s->gravity_factor = 1.0f;
+  s->update_position = true;
+  s->allow_sleeping = true;
+  s->double_sided = true;
+}
+
+uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const float* inverse_masses,
+                               uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                               const float* position3, const float* rotation4, const JoltClothSettings* s,
+                               uint64_t user_data) {
+  if (vertex_count < 3 || index_count < 3) return BodyID::cInvalidBodyID;
+  Ref<SoftBodySharedSettings> shared = new SoftBodySharedSettings();
+  shared->mVertices.reserve(vertex_count);
+  for (uint32_t i = 0; i < vertex_count; ++i) {
+    SoftBodySharedSettings::Vertex v(Float3(positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]));
+    v.mInvMass = inverse_masses != nullptr ? std::max(0.0f, inverse_masses[i]) : 1.0f;
+    shared->mVertices.push_back(v);
+  }
+  for (uint32_t i = 0; i + 2 < index_count; i += 3) {
+    SoftBodySharedSettings::Face f(indices[i], indices[i + 1], indices[i + 2]);
+    if (f.mVertex[0] >= vertex_count || f.mVertex[1] >= vertex_count || f.mVertex[2] >= vertex_count) continue;
+    if (f.IsDegenerate()) continue;
+    shared->AddFace(f);
+  }
+  if (shared->mFaces.empty()) return BodyID::cInvalidBodyID;
+  auto compliance = [](float value) { return value < 0.0f ? FLT_MAX : value; };
+  const SoftBodySharedSettings::ELRAType lra = s->lra_type == 2   ? SoftBodySharedSettings::ELRAType::GeodesicDistance
+                                               : s->lra_type == 1 ? SoftBodySharedSettings::ELRAType::EuclideanDistance
+                                                                  : SoftBodySharedSettings::ELRAType::None;
+  const SoftBodySharedSettings::VertexAttributes attributes(compliance(s->edge_compliance),
+                                                            compliance(s->shear_compliance),
+                                                            compliance(s->bend_compliance), lra,
+                                                            std::max(1.0f, s->lra_max_distance_multiplier));
+  const SoftBodySharedSettings::EBendType bend = s->bend_type == 2   ? SoftBodySharedSettings::EBendType::Dihedral
+                                                 : s->bend_type == 1 ? SoftBodySharedSettings::EBendType::Distance
+                                                                     : SoftBodySharedSettings::EBendType::None;
+  shared->CreateConstraints(&attributes, 1, bend);
+  shared->Optimize();
+
+  SoftBodyCreationSettings settings(shared, RVec3(vec3(position3)), quat(rotation4), Layers::kMoving);
+  settings.mUserData = user_data;
+  settings.mNumIterations = std::max<uint32_t>(1, s->iterations);
+  settings.mLinearDamping = s->linear_damping;
+  settings.mMaxLinearVelocity = s->max_linear_velocity;
+  settings.mFriction = s->friction;
+  settings.mRestitution = s->restitution;
+  settings.mPressure = s->pressure;
+  settings.mVertexRadius = s->vertex_radius;
+  settings.mGravityFactor = s->gravity_factor;
+  settings.mUpdatePosition = s->update_position;
+  settings.mAllowSleeping = s->allow_sleeping;
+  settings.mFacesDoubleSided = s->double_sided;
+  const BodyID id = bodies(world).CreateAndAddSoftBody(settings, EActivation::Activate);
+  if (id.IsInvalid()) return BodyID::cInvalidBodyID;
+  BodyData& d = world->data(id);
+  d = BodyData();
+  d.used = true;
+  return id.GetIndexAndSequenceNumber();
+}
+
+static SoftBodyMotionProperties* softBody(Body& body) {
+  return body.IsSoftBody() ? static_cast<SoftBodyMotionProperties*>(body.GetMotionPropertiesUnchecked()) : nullptr;
+}
+
+uint32_t jolt_soft_body_vertex_count(JoltWorld* world, uint32_t body) {
+  BodyLockRead lock(world->system.GetBodyLockInterface(), bodyId(body));
+  if (!lock.Succeeded() || !lock.GetBody().IsSoftBody()) return 0;
+  return uint32_t(static_cast<const SoftBodyMotionProperties*>(lock.GetBody().GetMotionPropertiesUnchecked())
+                      ->GetVertices()
+                      .size());
+}
+
+uint32_t jolt_soft_body_get_vertices(JoltWorld* world, uint32_t body, float* out, uint32_t max) {
+  BodyLockRead lock(world->system.GetBodyLockInterface(), bodyId(body));
+  if (!lock.Succeeded() || !lock.GetBody().IsSoftBody()) return 0;
+  const Body& b = lock.GetBody();
+  const auto* mp = static_cast<const SoftBodyMotionProperties*>(b.GetMotionPropertiesUnchecked());
+  const RMat44 com = b.GetCenterOfMassTransform();
+  const uint32_t n = std::min<uint32_t>(max, uint32_t(mp->GetVertices().size()));
+  for (uint32_t i = 0; i < n; ++i) store(Vec3(com * mp->GetVertex(i).mPosition), out + 3 * i);
+  return n;
+}
+
+void jolt_soft_body_set_vertex(JoltWorld* world, uint32_t body, uint32_t index, const float* position3,
+                               float inverse_mass) {
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    Body& b = lock.GetBody();
+    SoftBodyMotionProperties* mp = softBody(b);
+    if (mp == nullptr || index >= mp->GetVertices().size()) return;
+    SoftBodyVertex& v = mp->GetVertex(index);
+    v.mPosition = Vec3(b.GetCenterOfMassTransform().Inversed() * RVec3(vec3(position3)));
+    v.mPreviousPosition = v.mPosition;
+    v.mVelocity = Vec3::sZero();
+    v.mInvMass = std::max(0.0f, inverse_mass);
+  }
+  bodies(world).ActivateBody(bodyId(body));
+}
+
+void jolt_soft_body_apply_wind(JoltWorld* world, uint32_t body, const float* wind3, float drag, float dt) {
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    Body& b = lock.GetBody();
+    SoftBodyMotionProperties* mp = softBody(b);
+    if (mp == nullptr) return;
+    // Vertex velocities are in the body's (centre of mass) frame.
+    const Vec3 wind = b.GetRotation().Conjugated() * vec3(wind3);
+    const float k = std::min(1.0f, std::max(0.0f, drag * dt));
+    for (SoftBodyVertex& v : mp->GetVertices()) {
+      if (v.mInvMass > 0.0f) v.mVelocity += (wind - v.mVelocity) * k;
+    }
+  }
+  bodies(world).ActivateBody(bodyId(body));
 }
 
 // --- Constraints --------------------------------------------------------------
