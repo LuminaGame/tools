@@ -695,6 +695,63 @@ external void jolt_soft_body_apply_wind(
   double dt,
 );
 
+/// Moves count pinned (inverse mass 0) vertices toward world targets
+/// (xyz triples, m) over dt: each gets the velocity that reaches its target
+/// at the end of the next step, so attachments drag the cloth smoothly.
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+    ffi.Float,
+  )
+>(isLeaf: true)
+external void jolt_soft_body_drive_vertices(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Uint32> indices,
+  ffi.Pointer<ffi.Float> targets,
+  int count,
+  double dt,
+);
+
+/// The vertices and their normals (area-weighted over the faces) in a frame
+/// of the caller's: world_to_local16 is a column-major 4x4 matrix taking world
+/// metres to that frame (it may scale; normals use its rotation and are
+/// renormalised). Writes 3 floats per vertex to each of out_positions and
+/// out_normals; returns the vertex count written.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+  )
+>(isLeaf: true)
+external int jolt_soft_body_get_local_vertices(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> world_to_local16,
+  ffi.Pointer<ffi.Float> out_positions,
+  ffi.Pointer<ffi.Float> out_normals,
+  int max,
+);
+
+/// Sets the inverse mass of vertex index (0 pins it where it is).
+@ffi.Native<
+  ffi.Void Function(ffi.Pointer<JoltWorld>, ffi.Uint32, ffi.Uint32, ffi.Float)
+>(isLeaf: true)
+external void jolt_soft_body_set_inverse_mass(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  int index,
+  double inverse_mass,
+);
+
 @ffi.Native<
   ffi.Pointer<JoltConstraint> Function(
     ffi.Pointer<JoltWorld>,

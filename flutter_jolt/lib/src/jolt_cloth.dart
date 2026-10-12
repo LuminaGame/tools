@@ -193,8 +193,10 @@ extension JoltWorldCloth on JoltWorld {
     }
   }
 
-  /// Pulls the free vertices' velocities toward [wind] (m/s) by [drag] per
-  /// second over [dt]; call it before each step.
+  /// Wind on the cloth's faces: each face is pushed along its normal by the
+  /// part of [wind] (m/s, relative to the face) that hits it, at [drag] per
+  /// second over [dt] (a face edge-on to the wind feels nothing, so cloth
+  /// billows and flutters); call it before each step.
   void applyClothWind(
     int body,
     Vector3 wind, {
@@ -212,4 +214,73 @@ extension JoltWorldCloth on JoltWorld {
       calloc.free(p);
     }
   }
+
+  /// Drives pinned vertices [indices] toward world [targets] (x, y, z per
+  /// vertex, m) over [dt]: they arrive at the end of the next step, moving
+  /// the cloth with them (an attachment that follows a moving parent).
+  void driveClothVertices(
+    int body,
+    Uint32List indices,
+    Float32List targets,
+    double dt,
+  ) {
+    final n = indices.length;
+    if (n == 0) return;
+    if (targets.length < n * 3) {
+      throw ArgumentError('targets needs 3 values per index');
+    }
+    final i = calloc<Uint32>(n);
+    final t = calloc<Float>(n * 3);
+    try {
+      i.asTypedList(n).setAll(0, indices);
+      t.asTypedList(n * 3).setAll(0, targets.sublist(0, n * 3));
+      b.jolt_soft_body_drive_vertices(handle, body, i, t, n, dt);
+    } finally {
+      calloc
+        ..free(i)
+        ..free(t);
+    }
+  }
+
+  /// The cloth's vertex positions and normals in another frame:
+  /// [worldToLocal] takes world metres there (it may scale, e.g. to
+  /// centimetres). Fills [positions] and [normals] (3 floats per vertex,
+  /// grown when too small) and returns the vertex count.
+  int clothLocalVertices(
+    int body,
+    Matrix4 worldToLocal,
+    Float32List positions,
+    Float32List normals,
+  ) {
+    final n = clothVertexCount(body);
+    if (n == 0 || positions.length < n * 3 || normals.length < n * 3) return 0;
+    final m = calloc<Float>(16);
+    final pos = calloc<Float>(n * 3);
+    final nrm = calloc<Float>(n * 3);
+    try {
+      for (var k = 0; k < 16; k++) {
+        m[k] = worldToLocal.storage[k];
+      }
+      final got = b.jolt_soft_body_get_local_vertices(
+        handle,
+        body,
+        m,
+        pos,
+        nrm,
+        n,
+      );
+      positions.setRange(0, got * 3, pos.asTypedList(got * 3));
+      normals.setRange(0, got * 3, nrm.asTypedList(got * 3));
+      return got;
+    } finally {
+      calloc
+        ..free(m)
+        ..free(pos)
+        ..free(nrm);
+    }
+  }
+
+  /// Pins vertex [index] where it is ([inverseMass] 0) or frees it.
+  void setClothInverseMass(int body, int index, double inverseMass) =>
+      b.jolt_soft_body_set_inverse_mass(handle, body, index, inverseMass);
 }

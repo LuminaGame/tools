@@ -195,4 +195,80 @@ void main() {
       expect(at(p, 0).distanceTo(Vector3(0, 0.5, 0)), lessThan(1e-4));
     },
   );
+
+  test(
+    'driven pins drag a hanging sheet along; local read-back gives unit normals in the caller frame (cm)',
+    () {
+      final world = JoltWorld(workerThreads: 0);
+      addTearDown(world.dispose);
+      const n = 7;
+      final (v, t) = grid(n, 1.0);
+      final top = [for (var i = n * (n - 1); i < n * n; i++) i];
+      final inv = [
+        for (var i = 0; i < v.length; i++) top.contains(i) ? 0.0 : 1.0,
+      ];
+      final cloth = world.createCloth(
+        v,
+        t,
+        inverseMasses: inv,
+        position: Vector3(0, 2, 0),
+        rotation: Quaternion.axisAngle(Vector3(1, 0, 0), -math.pi / 2),
+      );
+      final start = world.clothVertices(cloth);
+      // Move the pins 1 m along +X over one second.
+      for (var step = 1; step <= 120; step++) {
+        final targets = Float32List(top.length * 3);
+        for (var k = 0; k < top.length; k++) {
+          final p0 = at(start, top[k]);
+          targets
+            ..[3 * k] = p0.x + step / 120
+            ..[3 * k + 1] = p0.y
+            ..[3 * k + 2] = p0.z;
+        }
+        world.driveClothVertices(
+          cloth,
+          Uint32List.fromList(top),
+          targets,
+          1 / 120,
+        );
+        world.step(1 / 120);
+      }
+      final moved = world.clothVertices(cloth);
+      expect(
+        at(moved, top.first).x - at(start, top.first).x,
+        closeTo(1.0, 0.01),
+      );
+      // A driven pin keeps its velocity until driven again: hold it still.
+      final hold = Float32List(top.length * 3);
+      for (var k = 0; k < top.length; k++) {
+        hold.setRange(3 * k, 3 * k + 3, at(moved, top[k]).storage);
+      }
+      world.driveClothVertices(cloth, Uint32List.fromList(top), hold, 1 / 120);
+      for (var i = 0; i < 120; i++) {
+        world.step(1 / 120);
+      }
+      final settled = world.clothVertices(cloth);
+      expect(
+        at(settled, 0).x - at(start, 0).x,
+        closeTo(1.0, 0.1),
+        reason: 'the bottom follows the pins',
+      );
+      // Read back in centimetres, shifted 2 m down.
+      final toCm = Matrix4.diagonal3Values(100, 100, 100)
+        ..translateByDouble(0.0, -2.0, 0.0, 1.0);
+      final pos = Float32List(n * n * 3), nrm = Float32List(n * n * 3);
+      expect(world.clothLocalVertices(cloth, toCm, pos, nrm), n * n);
+      expect(
+        pos[3 * top.first + 1],
+        closeTo((at(settled, top.first).y - 2) * 100, 0.01),
+      );
+      for (var i = 0; i < n * n; i++) {
+        expect(at(nrm, i).length, closeTo(1, 1e-4));
+      }
+      // A hanging sheet faces horizontally.
+      expect(at(nrm, n * 3 + 3).y.abs(), lessThan(0.3));
+      world.setClothInverseMass(cloth, 0, 0);
+      world.step(1 / 120);
+    },
+  );
 }

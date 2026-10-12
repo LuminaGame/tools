@@ -11,7 +11,8 @@
 - Steps run on a stepping thread of their own with a 16 MB stack (a deep
   narrow phase on a Dart mutator thread's small stack corrupted the VM).
 - Cloth soft bodies: `JoltWorld.createCloth` with pinned vertices, edge /
-  shear / bend compliances, tethers, wind, vertex read-back.
+  shear / bend compliances, tethers, aerodynamic wind, driven pins, vertex
+  and normal read-back in a caller's frame.
 - `tool/build_jolt.bat` / `tool/build_jolt.sh` fetch the pinned Jolt release
   and build a static library; the native-assets hook links it with the same
   `JPH_*` defines, or builds nothing when no Jolt build exists

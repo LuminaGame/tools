@@ -307,10 +307,29 @@ JOLT_C_EXPORT uint32_t jolt_soft_body_get_vertices(JoltWorld* world, uint32_t bo
 /// for a kinematic attachment; > 0 frees it), zeroing its velocity.
 JOLT_C_EXPORT void jolt_soft_body_set_vertex(JoltWorld* world, uint32_t body, uint32_t index, const float* position3,
                                              float inverse_mass);
-/// Wind: pulls every free vertex's velocity toward wind3 (m/s) by
-/// drag * dt (a fraction per second), and wakes the body.
+/// Wind (aerodynamic): every face is pushed along its normal by the part of
+/// the wind velocity wind3 (m/s, relative to the face) that hits it, at
+/// drag * dt (a fraction per second); a face edge-on to the wind feels
+/// nothing. Wakes the body.
 JOLT_C_EXPORT void jolt_soft_body_apply_wind(JoltWorld* world, uint32_t body, const float* wind3, float drag,
                                              float dt);
+
+/// Moves count pinned (inverse mass 0) vertices toward world targets
+/// (xyz triples, m) over dt: each gets the velocity that reaches its target
+/// at the end of the next step, so attachments drag the cloth smoothly.
+JOLT_C_EXPORT void jolt_soft_body_drive_vertices(JoltWorld* world, uint32_t body, const uint32_t* indices,
+                                                 const float* targets, uint32_t count, float dt);
+/// The vertices and their normals (area-weighted over the faces) in a frame
+/// of the caller's: world_to_local16 is a column-major 4x4 matrix taking world
+/// metres to that frame (it may scale; normals use its rotation and are
+/// renormalised). Writes 3 floats per vertex to each of out_positions and
+/// out_normals; returns the vertex count written.
+JOLT_C_EXPORT uint32_t jolt_soft_body_get_local_vertices(JoltWorld* world, uint32_t body,
+                                                         const float* world_to_local16, float* out_positions,
+                                                         float* out_normals, uint32_t max);
+/// Sets the inverse mass of vertex index (0 pins it where it is).
+JOLT_C_EXPORT void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index,
+                                                   float inverse_mass);
 
 // --- Constraints --------------------------------------------------------------
 

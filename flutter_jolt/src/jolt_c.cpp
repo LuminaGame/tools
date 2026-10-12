@@ -1019,9 +1019,95 @@ void jolt_soft_body_apply_wind(JoltWorld* world, uint32_t body, const float* win
     // Vertex velocities are in the body's (centre of mass) frame.
     const Vec3 wind = b.GetRotation().Conjugated() * vec3(wind3);
     const float k = std::min(1.0f, std::max(0.0f, drag * dt));
-    for (SoftBodyVertex& v : mp->GetVertices()) {
-      if (v.mInvMass > 0.0f) v.mVelocity += (wind - v.mVelocity) * k;
+    auto& vertices = mp->GetVertices();
+    // Aerodynamic drag: each face is pushed along its normal by the part of
+    // the relative wind that hits it (a face edge-on to the wind feels
+    // nothing), so cloth billows and flutters instead of moving as a block.
+    std::vector<Vec3> push(vertices.size(), Vec3::sZero());
+    std::vector<float> faces(vertices.size(), 0.0f);
+    for (const SoftBodySharedSettings::Face& f : mp->GetFaces()) {
+      const SoftBodyVertex& a = vertices[f.mVertex[0]];
+      const SoftBodyVertex& b2 = vertices[f.mVertex[1]];
+      const SoftBodyVertex& c = vertices[f.mVertex[2]];
+      Vec3 n = (b2.mPosition - a.mPosition).Cross(c.mPosition - a.mPosition);
+      const float len = n.Length();
+      if (len < 1.0e-12f) continue;
+      n /= len;
+      const Vec3 relative = wind - (a.mVelocity + b2.mVelocity + c.mVelocity) / 3.0f;
+      const Vec3 dv = n * (relative.Dot(n) * k);
+      for (uint32 i = 0; i < 3; ++i) {
+        push[f.mVertex[i]] += dv;
+        faces[f.mVertex[i]] += 1.0f;
+      }
     }
+    for (size_t i = 0; i < vertices.size(); ++i) {
+      SoftBodyVertex& v = vertices[i];
+      if (v.mInvMass > 0.0f && faces[i] > 0.0f) v.mVelocity += push[i] / faces[i];
+    }
+  }
+  bodies(world).ActivateBody(bodyId(body));
+}
+
+void jolt_soft_body_drive_vertices(JoltWorld* world, uint32_t body, const uint32_t* indices, const float* targets,
+                                   uint32_t count, float dt) {
+  if (dt <= 0.0f) return;
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    Body& b = lock.GetBody();
+    SoftBodyMotionProperties* mp = softBody(b);
+    if (mp == nullptr) return;
+    const RMat44 toLocal = b.GetCenterOfMassTransform().InversedRotationTranslation();
+    const uint32_t n = uint32_t(mp->GetVertices().size());
+    for (uint32_t i = 0; i < count; ++i) {
+      if (indices[i] >= n) continue;
+      SoftBodyVertex& v = mp->GetVertex(indices[i]);
+      if (v.mInvMass > 0.0f) continue;
+      const Vec3 target = Vec3(toLocal * RVec3(vec3(targets + 3 * i)));
+      v.mVelocity = (target - v.mPosition) / dt;
+    }
+  }
+  bodies(world).ActivateBody(bodyId(body));
+}
+
+uint32_t jolt_soft_body_get_local_vertices(JoltWorld* world, uint32_t body, const float* m, float* out_positions,
+                                           float* out_normals, uint32_t max) {
+  BodyLockRead lock(world->system.GetBodyLockInterface(), bodyId(body));
+  if (!lock.Succeeded() || !lock.GetBody().IsSoftBody()) return 0;
+  const Body& b = lock.GetBody();
+  const auto* mp = static_cast<const SoftBodyMotionProperties*>(b.GetMotionPropertiesUnchecked());
+  const auto& vertices = mp->GetVertices();
+  const uint32_t n = std::min<uint32_t>(max, uint32_t(vertices.size()));
+  // Area-weighted vertex normals in the body frame.
+  std::vector<Vec3> normals(vertices.size(), Vec3::sZero());
+  for (const SoftBodySharedSettings::Face& f : mp->GetFaces()) {
+    const Vec3 x0 = vertices[f.mVertex[0]].mPosition;
+    const Vec3 n0 = (vertices[f.mVertex[1]].mPosition - x0).Cross(vertices[f.mVertex[2]].mPosition - x0);
+    for (uint32 k = 0; k < 3; ++k) normals[f.mVertex[k]] += n0;
+  }
+  const Mat44 local(Vec4(m[0], m[1], m[2], m[3]), Vec4(m[4], m[5], m[6], m[7]), Vec4(m[8], m[9], m[10], m[11]),
+                    Vec4(m[12], m[13], m[14], m[15]));
+  const Mat44 com = b.GetCenterOfMassTransform();
+  const Mat44 full = local * com;
+  for (uint32_t i = 0; i < n; ++i) {
+    store(full * vertices[i].mPosition, out_positions + 3 * i);
+    Vec3 nrm = full.Multiply3x3(normals[i]);
+    const float len = nrm.Length();
+    nrm = len > 1.0e-12f ? nrm / len : Vec3::sAxisY();
+    store(nrm, out_normals + 3 * i);
+  }
+  return n;
+}
+
+void jolt_soft_body_set_inverse_mass(JoltWorld* world, uint32_t body, uint32_t index, float inverse_mass) {
+  {
+    BodyLockWrite lock(world->system.GetBodyLockInterface(), bodyId(body));
+    if (!lock.Succeeded()) return;
+    SoftBodyMotionProperties* mp = softBody(lock.GetBody());
+    if (mp == nullptr || index >= mp->GetVertices().size()) return;
+    SoftBodyVertex& v = mp->GetVertex(index);
+    v.mInvMass = std::max(0.0f, inverse_mass);
+    if (v.mInvMass == 0.0f) v.mVelocity = Vec3::sZero();
   }
   bodies(world).ActivateBody(bodyId(body));
 }
