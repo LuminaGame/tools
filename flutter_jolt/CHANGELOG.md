@@ -17,6 +17,8 @@
   per-step skinning; cloths ignore their owner's bodies except colliders.
 - `JoltWorld.carryCloth`: carry a cloth along a rigid motion (inertia scale,
   teleports).
+- `JoltWorld.setClothSelfCollision`: a cloth keeps a distance from its own
+  triangles (vertex-triangle, after every step).
 - `tool/build_jolt.bat` / `tool/build_jolt.sh` fetch the pinned Jolt release
   and build a static library; the native-assets hook links it with the same
   `JPH_*` defines, or builds nothing when no Jolt build exists

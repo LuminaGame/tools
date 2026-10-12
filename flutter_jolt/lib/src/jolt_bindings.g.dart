@@ -839,6 +839,19 @@ external void jolt_body_set_cloth_collider(
   bool cloth_collider,
 );
 
+/// Self-collision for a cloth: after every step, a vertex closer than
+/// distance (m) to one of the cloth's triangles is pushed out (the triangle
+/// back) and stops approaching it, except where it is that close at rest
+/// (its neighbours). 0 switches it off.
+@ffi.Native<ffi.Void Function(ffi.Pointer<JoltWorld>, ffi.Uint32, ffi.Float)>(
+  isLeaf: true,
+)
+external void jolt_soft_body_set_self_collision(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  double distance,
+);
+
 @ffi.Native<
   ffi.Pointer<JoltConstraint> Function(
     ffi.Pointer<JoltWorld>,

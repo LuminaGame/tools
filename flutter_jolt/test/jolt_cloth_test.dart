@@ -425,4 +425,54 @@ void main() {
       expect(world.clothVertices(cloth)[0] - quarter[0], closeTo(5, 1e-4));
     },
   );
+  test(
+    'with self-collision a sheet falling on another piece of the same cloth rests on it',
+    () {
+      /// The lowest the upper sheet gets above the lower one (m).
+      double gap(bool selfCollision) {
+        final world = JoltWorld(workerThreads: 1);
+        addTearDown(world.dispose);
+        const n = 9;
+        final (lower, t) = grid(n, 0.6);
+        final upper = [for (final v in lower) v + Vector3(0.02, 0.15, 0.03)];
+        final triangles = [...t, for (final i in t) i + lower.length];
+        // The lower sheet hangs flat from its four corners.
+        final corners = {0, n - 1, n * (n - 1), n * n - 1};
+        final cloth = world.createCloth(
+          [...lower, ...upper],
+          triangles,
+          inverseMasses: [
+            for (var i = 0; i < 2 * lower.length; i++)
+              corners.contains(i) ? 0.0 : 1.0,
+          ],
+          position: Vector3(0, 1, 0),
+          settings: JoltClothSettings(vertexRadius: 0.005),
+        );
+        if (selfCollision) world.setClothSelfCollision(cloth, 0.02);
+        for (var i = 0; i < 240; i++) {
+          world.step(1 / 120);
+        }
+        final p = world.clothVertices(cloth);
+        var lowest = double.infinity;
+        for (var i = 0; i < lower.length; i++) {
+          // The upper vertex over the middle of the lower sheet.
+          final u = at(p, lower.length + i), l = at(p, i);
+          lowest = math.min(lowest, u.y - l.y);
+        }
+        return lowest;
+      }
+
+      final without = gap(false), with_ = gap(true);
+      // ignore: avoid_print
+      print(
+        'upper above lower: without ${without.toStringAsFixed(3)} m, with ${with_.toStringAsFixed(3)} m',
+      );
+      expect(
+        without,
+        lessThan(0),
+        reason: 'without it the upper sheet falls through',
+      );
+      expect(with_, greaterThan(0.01));
+    },
+  );
 }

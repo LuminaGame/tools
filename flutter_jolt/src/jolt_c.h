@@ -370,6 +370,11 @@ JOLT_C_EXPORT void jolt_soft_body_skin(JoltWorld* world, uint32_t body, const fl
 /// A body a cloth of the same owner collides with (a character's limb
 /// capsules for its garment); other bodies of the cloth's owner are ignored.
 JOLT_C_EXPORT void jolt_body_set_cloth_collider(JoltWorld* world, uint32_t body, bool cloth_collider);
+/// Self-collision for a cloth: after every step, a vertex closer than
+/// distance (m) to one of the cloth's triangles is pushed out (the triangle
+/// back) and stops approaching it, except where it is that close at rest
+/// (its neighbours). 0 switches it off.
+JOLT_C_EXPORT void jolt_soft_body_set_self_collision(JoltWorld* world, uint32_t body, float distance);
 
 // --- Constraints --------------------------------------------------------------
 

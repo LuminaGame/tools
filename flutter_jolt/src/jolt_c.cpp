@@ -147,6 +147,8 @@ struct BodyData {
   uint64 owner = 0;
   bool collidesWithOwner = false;
   bool clothCollider = false;
+  float selfCollision = 0.0f;  // a cloth's self-collision distance (m), 0: off
+  uint32_t selfCollisionBody = 0;  // its full body id
   std::vector<uint16> profiles;
   float friction = 0.7f;
   float staticFriction = 0.7f;
@@ -497,6 +499,145 @@ void jolt_world_set_solver_settings(JoltWorld* world, const JoltSolverSettings* 
   world->system.SetPhysicsSettings(p);
 }
 
+// --- Cloth self-collision -------------------------------------------------
+
+static SoftBodyMotionProperties* softBody(Body& body);
+
+// The point of triangle abc closest to p, as barycentric weights (u, v, w)
+// of a, b, c (Ericson, Real-Time Collision Detection 5.1.5).
+static Vec3 closestOnTriangle(Vec3 p, Vec3 a, Vec3 b, Vec3 c, float& u, float& v, float& w) {
+  const Vec3 ab = b - a, ac = c - a, ap = p - a;
+  const float d1 = ab.Dot(ap), d2 = ac.Dot(ap);
+  if (d1 <= 0.0f && d2 <= 0.0f) { u = 1; v = 0; w = 0; return a; }
+  const Vec3 bp = p - b;
+  const float d3 = ab.Dot(bp), d4 = ac.Dot(bp);
+  if (d3 >= 0.0f && d4 <= d3) { u = 0; v = 1; w = 0; return b; }
+  const float vc = d1 * d4 - d3 * d2;
+  if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+    const float t = d1 / (d1 - d3);
+    u = 1 - t; v = t; w = 0;
+    return a + ab * t;
+  }
+  const Vec3 cp = p - c;
+  const float d5 = ab.Dot(cp), d6 = ac.Dot(cp);
+  if (d6 >= 0.0f && d5 <= d6) { u = 0; v = 0; w = 1; return c; }
+  const float vb = d5 * d2 - d1 * d6;
+  if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+    const float t = d2 / (d2 - d6);
+    u = 1 - t; v = 0; w = t;
+    return a + ac * t;
+  }
+  const float va = d3 * d6 - d5 * d4;
+  if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+    const float t = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+    u = 0; v = 1 - t; w = t;
+    return b + (c - b) * t;
+  }
+  const float denom = 1.0f / (va + vb + vc);
+  v = vb * denom; w = vc * denom; u = 1 - v - w;
+  return a + ab * v + ac * w;
+}
+
+// Keeps the vertices of one cloth at least distance away from its own
+// triangles (one pass over a grid of cells): a vertex closer than that to a
+// triangle it is not part of is pushed out, the triangle back by its
+// barycentric weights, and their approaching velocity is removed. A vertex
+// that close to the triangle at rest is its neighbour and skipped.
+static void selfCollide(JoltWorld* world, BodyID id, float distance) {
+  BodyLockWrite lock(world->system.GetBodyLockInterface(), id);
+  if (!lock.Succeeded()) return;
+  SoftBodyMotionProperties* mp = softBody(lock.GetBody());
+  if (mp == nullptr) return;
+  const uint32_t n = uint32_t(mp->GetVertices().size());
+  const auto& rest = mp->GetSettings()->mVertices;
+  const auto& faces = mp->GetFaces();
+  if (n < 4 || rest.size() != n || faces.empty()) return;
+  // Cells as large as the longest edge (at least the distance), so a
+  // triangle's box spans few of them.
+  float cell = distance;
+  for (const SoftBodySharedSettings::Face& f : faces) {
+    for (int k = 0; k < 3; ++k) {
+      const Vec3 e = mp->GetVertex(f.mVertex[k]).mPosition - mp->GetVertex(f.mVertex[(k + 1) % 3]).mPosition;
+      cell = std::max(cell, e.Length());
+    }
+  }
+  const float inv = 1.0f / cell;
+  auto key = [](int64_t x, int64_t y, int64_t z) { return uint64_t((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)); };
+  auto coord = [&](float v) { return int64_t(std::floor(v * inv)); };
+  const float skip2 = (1.5f * distance) * (1.5f * distance);
+  // Vertices sorted by cell; each triangle looks at the cells its box
+  // (grown by the distance) covers.
+  std::vector<std::pair<uint64_t, uint32_t>> cells(n);
+  {
+    for (uint32_t i = 0; i < n; ++i) {
+      const Vec3 p = mp->GetVertex(i).mPosition;
+      cells[i] = {key(coord(p.GetX()), coord(p.GetY()), coord(p.GetZ())), i};
+    }
+    std::sort(cells.begin(), cells.end());
+    for (const SoftBodySharedSettings::Face& f : faces) {
+      SoftBodyVertex& a = mp->GetVertex(f.mVertex[0]);
+      SoftBodyVertex& b = mp->GetVertex(f.mVertex[1]);
+      SoftBodyVertex& c = mp->GetVertex(f.mVertex[2]);
+      const Vec3 lo = Vec3::sMin(Vec3::sMin(a.mPosition, b.mPosition), c.mPosition) - Vec3::sReplicate(distance);
+      const Vec3 hi = Vec3::sMax(Vec3::sMax(a.mPosition, b.mPosition), c.mPosition) + Vec3::sReplicate(distance);
+      for (int64_t x = coord(lo.GetX()); x <= coord(hi.GetX()); ++x)
+        for (int64_t y = coord(lo.GetY()); y <= coord(hi.GetY()); ++y)
+          for (int64_t z = coord(lo.GetZ()); z <= coord(hi.GetZ()); ++z) {
+            const uint64_t k = key(x, y, z);
+            auto it = std::lower_bound(cells.begin(), cells.end(), std::make_pair(k, uint32_t(0)));
+            for (; it != cells.end() && it->first == k; ++it) {
+              const uint32_t i = it->second;
+              if (f.mVertex[0] == i || f.mVertex[1] == i || f.mVertex[2] == i) continue;
+              SoftBodyVertex& p = mp->GetVertex(i);
+              float u, v, w;
+              const Vec3 q = closestOnTriangle(p.mPosition, a.mPosition, b.mPosition, c.mPosition, u, v, w);
+              const Vec3 delta = p.mPosition - q;
+              const float len2 = delta.LengthSq();
+              if (len2 >= distance * distance) continue;
+              float ru, rv, rw;
+              const Vec3 rp(rest[i].mPosition);
+              const Vec3 rq = closestOnTriangle(rp, Vec3(rest[f.mVertex[0]].mPosition), Vec3(rest[f.mVertex[1]].mPosition),
+                                                Vec3(rest[f.mVertex[2]].mPosition), ru, rv, rw);
+              if ((rp - rq).LengthSq() < skip2) continue;
+              // Weighted like a point on the triangle with its vertices' masses.
+              const float wt = u * u * a.mInvMass + v * v * b.mInvMass + w * w * c.mInvMass;
+              const float total = p.mInvMass + wt;
+              if (total <= 0.0f) continue;
+              const float len = std::sqrt(len2);
+              Vec3 normal;
+              if (len > 1.0e-6f) {
+                normal = delta / len;
+              } else {
+                normal = (b.mPosition - a.mPosition).Cross(c.mPosition - a.mPosition).NormalizedOr(Vec3::sAxisY());
+                if (normal.Dot(p.mVelocity - (a.mVelocity * u + b.mVelocity * v + c.mVelocity * w)) > 0.0f) normal = -normal;
+              }
+              const float lambda = (distance - len) / total;
+              p.mPosition += normal * (lambda * p.mInvMass);
+              a.mPosition -= normal * (lambda * u * a.mInvMass);
+              b.mPosition -= normal * (lambda * v * b.mInvMass);
+              c.mPosition -= normal * (lambda * w * c.mInvMass);
+              const Vec3 vt = a.mVelocity * u + b.mVelocity * v + c.mVelocity * w;
+              const float approach = normal.Dot(p.mVelocity - vt);
+              if (approach < 0.0f) {
+                const float impulse = -approach / total;
+                p.mVelocity += normal * (impulse * p.mInvMass);
+                a.mVelocity -= normal * (impulse * u * a.mInvMass);
+                b.mVelocity -= normal * (impulse * v * b.mInvMass);
+                c.mVelocity -= normal * (impulse * w * c.mInvMass);
+              }
+            }
+          }
+    }
+  }
+}
+
+static void selfCollideCloths(JoltWorld* world) {
+  for (const BodyData& data : world->bodies) {
+    if (!data.used || data.selfCollision <= 0.0f) continue;
+    selfCollide(world, BodyID(data.selfCollisionBody), data.selfCollision);
+  }
+}
+
 int32_t jolt_world_step(JoltWorld* world, float dt, int32_t collision_steps) {
   {
     std::lock_guard<std::mutex> lock(world->contactsMutex);
@@ -504,7 +645,10 @@ int32_t jolt_world_step(JoltWorld* world, float dt, int32_t collision_steps) {
   }
   EPhysicsUpdateError error = EPhysicsUpdateError::None;
   const int steps = std::max(1, collision_steps);
-  world->stepper->run([&] { error = world->system.Update(dt, steps, world->temp.get(), world->jobs.get()); });
+  world->stepper->run([&] {
+    error = world->system.Update(dt, steps, world->temp.get(), world->jobs.get());
+    selfCollideCloths(world);
+  });
   // Contacts in body order, so the same input reports them the same way
   // whatever thread found them first.
   std::sort(world->contacts.begin(), world->contacts.end(), [](const JoltContact& x, const JoltContact& y) {
@@ -1175,6 +1319,12 @@ void jolt_soft_body_skin(JoltWorld* world, uint32_t body, const float* joint_wor
     mp->SkinVertices(com, pose.data(), count, hard_skin_all, *world->temp);
   }
   bodies(world).ActivateBody(bodyId(body));
+}
+
+void jolt_soft_body_set_self_collision(JoltWorld* world, uint32_t body, float distance) {
+  BodyData& data = world->data(bodyId(body));
+  data.selfCollision = std::max(0.0f, distance);
+  data.selfCollisionBody = body;
 }
 
 void jolt_body_set_cloth_collider(JoltWorld* world, uint32_t body, bool cloth_collider) {

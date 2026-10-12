@@ -348,6 +348,13 @@ extension JoltWorldCloth on JoltWorld {
     }
   }
 
+  /// Self-collision for cloth [body]: after every step a vertex closer than
+  /// [distance] (m) to one of its triangles is pushed out (the triangle
+  /// back) and stops approaching it, except where it is that close at rest.
+  /// 0 switches it off.
+  void setClothSelfCollision(int body, double distance) =>
+      b.jolt_soft_body_set_self_collision(handle, body, distance);
+
   /// Pins vertex [index] where it is ([inverseMass] 0) or frees it.
   void setClothInverseMass(int body, int index, double inverseMass) =>
       b.jolt_soft_body_set_inverse_mass(handle, body, index, inverseMass);
