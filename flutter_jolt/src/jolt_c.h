@@ -258,6 +258,26 @@ typedef struct JoltRayHit {
   float normal[3];
 } JoltRayHit;
 
+/// Broad phase proxies: a static box body standing for the axis-aligned box
+/// min3..max3 (a query world never stepped: what a scene query should test
+/// in detail). Returns the body id; user_data comes back from the queries.
+JOLT_C_EXPORT uint32_t jolt_world_add_box_proxy(JoltWorld* world, const float* min3, const float* max3,
+                                                uint64_t user_data);
+/// Moves and resizes a proxy to the box min3..max3.
+JOLT_C_EXPORT void jolt_world_set_box_proxy(JoltWorld* world, uint32_t body, const float* min3, const float* max3);
+/// The user data of every body whose bounds the segment origin3 ->
+/// origin3 + delta3 crosses (broad phase only, any order); writes up to max,
+/// returns how many there are.
+JOLT_C_EXPORT uint32_t jolt_world_broad_phase_ray(JoltWorld* world, const float* origin3, const float* delta3,
+                                                  uint64_t* out_user_data, uint32_t max);
+/// The user data of every body whose bounds the box min3..max3 crosses when
+/// moved by delta3 (a swept shape's bounds).
+JOLT_C_EXPORT uint32_t jolt_world_broad_phase_box_cast(JoltWorld* world, const float* min3, const float* max3,
+                                                       const float* delta3, uint64_t* out_user_data, uint32_t max);
+/// The user data of every body whose bounds overlap the box min3..max3.
+JOLT_C_EXPORT uint32_t jolt_world_broad_phase_box(JoltWorld* world, const float* min3, const float* max3,
+                                                  uint64_t* out_user_data, uint32_t max);
+
 /// Casts the ray origin3 -> origin3 + direction3 (its length is the range)
 /// against every body; true and the closest hit when it hits.
 JOLT_C_EXPORT bool jolt_world_cast_ray(JoltWorld* world, const float* origin3, const float* direction3,

@@ -16,6 +16,7 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Body/BodyLockMulti.h>
+#include <Jolt/Physics/Collision/AABoxCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
@@ -422,6 +423,27 @@ BodyInterface& bodies(JoltWorld* w) { return w->system.GetBodyInterface(); }
 
 BodyID bodyId(uint32_t id) { return BodyID(id); }
 
+}  // namespace
+
+// Collects the user data of the bodies a broad phase query finds.
+namespace {
+template <class Base, class Result>
+class UserDataCollector final : public Base {
+ public:
+  UserDataCollector(BodyInterface& bodies, uint64_t* out, uint32_t max) : mBodies(bodies), mOut(out), mMax(max) {}
+  void AddHit(const Result& result) override {
+    if (mCount < mMax) mOut[mCount] = mBodies.GetUserData(bodyOf(result));
+    ++mCount;
+  }
+  uint32_t mCount = 0;
+
+ private:
+  static BodyID bodyOf(const BroadPhaseCastResult& r) { return r.mBodyID; }
+  static BodyID bodyOf(const BodyID& r) { return r; }
+  BodyInterface& mBodies;
+  uint64_t* mOut;
+  uint32_t mMax;
+};
 }  // namespace
 
 extern "C" {
@@ -1030,6 +1052,66 @@ uint32_t jolt_world_get_contacts(JoltWorld* world, JoltContact* out, uint32_t ma
 }
 
 // --- Queries ------------------------------------------------------------------
+
+// --- Broad phase proxies ------------------------------------------------------
+
+static Vec3 halfOf(const float* min3, const float* max3) {
+  // A flat box (a plane) still has a little thickness.
+  return Vec3::sMax((vec3(max3) - vec3(min3)) * 0.5f, Vec3::sReplicate(1.0e-4f));
+}
+
+uint32_t jolt_world_add_box_proxy(JoltWorld* world, const float* min3, const float* max3, uint64_t user_data) {
+  const Vec3 centre = (vec3(min3) + vec3(max3)) * 0.5f;
+  BodyCreationSettings s(new BoxShape(halfOf(min3, max3), 0.0f), RVec3(centre), Quat::sIdentity(),
+                         EMotionType::Static, Layers::kNonMoving);
+  s.mUserData = user_data;
+  const BodyID id = bodies(world).CreateAndAddBody(s, EActivation::DontActivate);
+  if (id.IsInvalid()) return 0xFFFFFFFFu;
+  BodyData& d = world->data(id);
+  d = BodyData();
+  d.used = true;
+  return id.GetIndexAndSequenceNumber();
+}
+
+void jolt_world_set_box_proxy(JoltWorld* world, uint32_t body, const float* min3, const float* max3) {
+  BodyInterface& bi = bodies(world);
+  const BodyID id = bodyId(body);
+  const Vec3 half = halfOf(min3, max3);
+  const RefConst<Shape> shape = bi.GetShape(id);
+  if (shape == nullptr) return;
+  const AABox local = shape->GetLocalBounds();
+  if (!local.GetExtent().IsClose(half, 1.0e-10f)) {
+    bi.SetShape(id, new BoxShape(half, 0.0f), false, EActivation::DontActivate);
+  }
+  bi.SetPosition(id, RVec3((vec3(min3) + vec3(max3)) * 0.5f), EActivation::DontActivate);
+}
+
+
+uint32_t jolt_world_broad_phase_ray(JoltWorld* world, const float* origin3, const float* delta3, uint64_t* out,
+                                    uint32_t max) {
+  UserDataCollector<RayCastBodyCollector, BroadPhaseCastResult> collector(world->system.GetBodyInterfaceNoLock(), out,
+                                                                          max);
+  world->system.GetBroadPhaseQuery().CastRay(RayCast(vec3(origin3), vec3(delta3)), collector);
+  return collector.mCount;
+}
+
+uint32_t jolt_world_broad_phase_box_cast(JoltWorld* world, const float* min3, const float* max3, const float* delta3,
+                                         uint64_t* out, uint32_t max) {
+  UserDataCollector<CastShapeBodyCollector, BroadPhaseCastResult> collector(world->system.GetBodyInterfaceNoLock(),
+                                                                            out, max);
+  AABoxCast cast;
+  cast.mBox = AABox(vec3(min3), vec3(max3));
+  cast.mDirection = vec3(delta3);
+  world->system.GetBroadPhaseQuery().CastAABox(cast, collector);
+  return collector.mCount;
+}
+
+uint32_t jolt_world_broad_phase_box(JoltWorld* world, const float* min3, const float* max3, uint64_t* out,
+                                    uint32_t max) {
+  UserDataCollector<CollideShapeBodyCollector, BodyID> collector(world->system.GetBodyInterfaceNoLock(), out, max);
+  world->system.GetBroadPhaseQuery().CollideAABox(AABox(vec3(min3), vec3(max3)), collector);
+  return collector.mCount;
+}
 
 bool jolt_world_cast_ray(JoltWorld* world, const float* origin3, const float* direction3, JoltRayHit* out) {
   const RRayCast ray(RVec3(vec3(origin3)), vec3(direction3));

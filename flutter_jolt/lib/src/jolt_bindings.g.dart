@@ -580,6 +580,99 @@ external int jolt_world_get_contacts(
   int max,
 );
 
+/// Broad phase proxies: a static box body standing for the axis-aligned box
+/// min3..max3 (a query world never stepped: what a scene query should test
+/// in detail). Returns the body id; user_data comes back from the queries.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint64,
+  )
+>(isLeaf: true)
+external int jolt_world_add_box_proxy(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> min3,
+  ffi.Pointer<ffi.Float> max3,
+  int user_data,
+);
+
+/// Moves and resizes a proxy to the box min3..max3.
+@ffi.Native<
+  ffi.Void Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+  )
+>(isLeaf: true)
+external void jolt_world_set_box_proxy(
+  ffi.Pointer<JoltWorld> world,
+  int body,
+  ffi.Pointer<ffi.Float> min3,
+  ffi.Pointer<ffi.Float> max3,
+);
+
+/// The user data of every body whose bounds the segment origin3 ->
+/// origin3 + delta3 crosses (broad phase only, any order); writes up to max,
+/// returns how many there are.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Uint64>,
+    ffi.Uint32,
+  )
+>(isLeaf: true)
+external int jolt_world_broad_phase_ray(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> origin3,
+  ffi.Pointer<ffi.Float> delta3,
+  ffi.Pointer<ffi.Uint64> out_user_data,
+  int max,
+);
+
+/// The user data of every body whose bounds the box min3..max3 crosses when
+/// moved by delta3 (a swept shape's bounds).
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Uint64>,
+    ffi.Uint32,
+  )
+>(isLeaf: true)
+external int jolt_world_broad_phase_box_cast(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> min3,
+  ffi.Pointer<ffi.Float> max3,
+  ffi.Pointer<ffi.Float> delta3,
+  ffi.Pointer<ffi.Uint64> out_user_data,
+  int max,
+);
+
+/// The user data of every body whose bounds overlap the box min3..max3.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Uint64>,
+    ffi.Uint32,
+  )
+>(isLeaf: true)
+external int jolt_world_broad_phase_box(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> min3,
+  ffi.Pointer<ffi.Float> max3,
+  ffi.Pointer<ffi.Uint64> out_user_data,
+  int max,
+);
+
 /// Casts the ray origin3 -> origin3 + direction3 (its length is the range)
 /// against every body; true and the closest hit when it hits.
 @ffi.Native<

@@ -17,6 +17,8 @@
   per-step skinning; cloths ignore their owner's bodies except colliders.
 - `JoltWorld.carryCloth`: carry a cloth along a rigid motion (inertia scale,
   teleports).
+- Broad phase proxies for scene queries: `addBoxProxy`, `setBoxProxy`,
+  `broadPhaseRay`, `broadPhaseBoxCast`, `broadPhaseBox`.
 - `JoltWorld.setClothSelfCollision`: a cloth keeps a distance from its own
   triangles (vertex-triangle, after every step).
 - `tool/build_jolt.bat` / `tool/build_jolt.sh` fetch the pinned Jolt release

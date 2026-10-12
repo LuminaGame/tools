@@ -416,6 +416,72 @@ class JoltWorld {
 
   /// The closest hit of the ray [origin] → [origin] + [direction] (its length
   /// is the range), or null.
+  /// A broad phase proxy for the box [min]..[max] (a static body in a
+  /// world used for scene queries); [userData] comes back from
+  /// [broadPhaseRay] and [broadPhaseBox]. Returns the body id.
+  int addBoxProxy(Vector3 min, Vector3 max, int userData) {
+    _put3(0, min);
+    _put3(3, max);
+    return b.jolt_world_add_box_proxy(handle, _f, _f + 3, userData);
+  }
+
+  /// Moves and resizes proxy [body] to the box [min]..[max].
+  void setBoxProxy(int body, Vector3 min, Vector3 max) {
+    _put3(0, min);
+    _put3(3, max);
+    b.jolt_world_set_box_proxy(handle, body, _f, _f + 3);
+  }
+
+  Pointer<Uint64> _hits = nullptr;
+  int _hitCapacity = 0;
+
+  List<int> _collect(int Function(Pointer<Uint64> out, int max) query) {
+    for (;;) {
+      if (_hitCapacity == 0) {
+        _hitCapacity = 256;
+        _hits = calloc<Uint64>(_hitCapacity);
+      }
+      final n = query(_hits, _hitCapacity);
+      if (n <= _hitCapacity) return List<int>.generate(n, (i) => _hits[i]);
+      calloc.free(_hits);
+      _hitCapacity = n * 2;
+      _hits = calloc<Uint64>(_hitCapacity);
+    }
+  }
+
+  /// The user data of every body whose bounds the segment [origin] ->
+  /// [origin] + [delta] crosses (broad phase, any order). After proxies
+  /// moved this is a superset (a moved body may still be found where it
+  /// was) until [optimizeBroadPhase] rebuilds the tree; never one missed.
+  List<int> broadPhaseRay(Vector3 origin, Vector3 delta) {
+    _put3(0, origin);
+    _put3(3, delta);
+    return _collect(
+      (out, max) => b.jolt_world_broad_phase_ray(handle, _f, _f + 3, out, max),
+    );
+  }
+
+  /// The user data of every body whose bounds the box [min]..[max] crosses
+  /// when moved by [delta] (a swept shape).
+  List<int> broadPhaseBoxCast(Vector3 min, Vector3 max, Vector3 delta) {
+    _put3(0, min);
+    _put3(3, max);
+    _put3(6, delta);
+    return _collect(
+      (out, n) =>
+          b.jolt_world_broad_phase_box_cast(handle, _f, _f + 3, _f + 6, out, n),
+    );
+  }
+
+  /// The user data of every body whose bounds overlap the box [min]..[max].
+  List<int> broadPhaseBox(Vector3 min, Vector3 max) {
+    _put3(0, min);
+    _put3(3, max);
+    return _collect(
+      (out, max) => b.jolt_world_broad_phase_box(handle, _f, _f + 3, out, max),
+    );
+  }
+
   JoltRayHit? castRay(Vector3 origin, Vector3 direction) {
     final hit = calloc<b.JoltRayHit>();
     try {
@@ -477,6 +543,9 @@ class JoltWorld {
     if (_states != nullptr) calloc.free(_states);
     if (_ids != nullptr) calloc.free(_ids);
     if (_contacts != nullptr) calloc.free(_contacts);
+    if (_hits != nullptr) calloc.free(_hits);
+    _hits = nullptr;
+    _hitCapacity = 0;
     _states = nullptr;
     _ids = nullptr;
     _contacts = nullptr;
