@@ -37,10 +37,10 @@ When none holds a library the hook prints a note and emits **no code asset**: th
 
 `src/jolt_c.h` declares the C API (`jolt_*`, exported with `JOLT_C_EXPORT`); `tool/ffigen.dart` generates the `@Native` bindings in `lib/src/jolt_bindings.g.dart` (needs libclang; `LIBCLANG_PATH` names its folder). Groups:
 
-- **World**: `jolt_world_create` (body / pair / contact capacities, worker threads), `jolt_world_destroy`, gravity, solver settings (velocity / position steps, Baumgarte, speculative contact distance, penetration slop, sleep time and threshold), `jolt_world_step` (returns Jolt's update error bits), broad-phase optimisation, body counts.
+- **World**: `jolt_world_create` (body / pair / contact capacities, worker threads), `jolt_world_destroy`, gravity, solver settings (velocity / position steps, Baumgarte, speculative contact distance, penetration slop, sleep time and threshold), `jolt_world_step` (returns Jolt's update error bits; the step runs on the world's own stepping thread with a 16 MB stack while the caller waits, because Jolt's narrow phase can need more stack than a Dart mutator thread has), broad-phase optimisation, body counts.
 - **Shapes** (reference counted, released with `jolt_shape_release`): box, sphere, capsule (Y axis), cylinder (Y axis), convex hull, height field (row-major samples, `jolt_heightfield_no_collision()` holes, about 1 mm precision), scaled, rotated/translated, centre-of-mass offset, static compound; `jolt_shape_set_user_data` names a leaf for contacts and ray hits.
 - **Bodies**: `jolt_body_create` from `JoltBodySettings` (motion type, pose, velocities, user data, friction, restitution, damping, gravity factor, mass and inertia override, allowed DOFs, continuous collision, sensor), destroy, owner and profiles (filtering), material with combine modes, shape, mass properties, motion type, damping, gravity factor, CCD, transform, velocity, kinematic moves, forces, torques, impulses, activation; `jolt_world_get_body_states` reads many bodies at once (`JOLT_BODY_STATE_STRIDE` doubles: centre of mass, rotation, linear and angular velocity, active, shape origin).
-- **Contacts**: `jolt_world_get_contacts` returns the added and persisted contacts of the last step, sorted by body: the two bodies and leaf user data, the mean point, the normal (from body A to body B), Jolt's estimated normal impulse (`EstimateCollisionResponse`), penetration and point count.
+- **Contacts**: `jolt_world_get_contacts` returns the added and persisted contacts of the last step, sorted by body: the two bodies and leaf user data, the mean point, the normal (from body A to body B), an estimated normal impulse (the impulse through the centres of mass that stops the bodies approaching at the contact, with restitution, from the velocities before the solver ran), penetration and point count.
 - **Queries**: `jolt_world_cast_ray`.
 - **Constraints**: `jolt_constraint_swing_twist` (twist about the frame's X axis, plane axis Y, normal and plane half cones, twist range, friction torque) and `jolt_constraint_hinge` (limits within `-π ≤ min ≤ 0 ≤ max ≤ π`), frames relative to each body's centre of mass; limits, friction torque, a velocity motor (`jolt_constraint_set_velocity_motor`), a position motor (`jolt_constraint_set_position_motor`: a spring of a frequency and damping ratio toward a target rotation; a hinge reads the angle about X), solver iterations for the constraint's island (`jolt_constraint_set_solver_steps`), enable, impulses.
 
@@ -82,7 +82,7 @@ Materials: friction combines static friction while the surfaces barely slide (un
 
 ## Limits
 
-- Contact impulses are Jolt's estimate for the step, not the solved impulse.
+- Contact impulses are estimates for the step (no rotation terms), not the solved impulses.
 - Height fields keep about 8 bits per sample per block (a few millimetres on metre-scale terrain) and are static only.
 - Built and tested on Windows x64; the Linux script mirrors it. Android, macOS, iOS and the web (WebAssembly) are not built yet.
 

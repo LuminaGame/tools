@@ -37,10 +37,10 @@ Hiçbiri kütüphane içermiyorsa hook bir not yazar ve **code asset üretmez**:
 
 `src/jolt_c.h` C API'sini bildirir (`jolt_*`, `JOLT_C_EXPORT` ile export edilir); `tool/ffigen.dart` `@Native` binding'lerini `lib/src/jolt_bindings.g.dart` dosyasına üretir (libclang gerekir; klasörünü `LIBCLANG_PATH` verir). Gruplar:
 
-- **Dünya**: `jolt_world_create` (body / çift / temas kapasiteleri, worker thread'ler), `jolt_world_destroy`, yerçekimi, çözücü ayarları (hız / konum adımları, Baumgarte, spekülatif temas mesafesi, penetrasyon payı, uyku süresi ve eşiği), `jolt_world_step` (Jolt'un update hata bitlerini döndürür), broad phase optimizasyonu, body sayıları.
+- **Dünya**: `jolt_world_create` (body / çift / temas kapasiteleri, worker thread'ler), `jolt_world_destroy`, yerçekimi, çözücü ayarları (hız / konum adımları, Baumgarte, spekülatif temas mesafesi, penetrasyon payı, uyku süresi ve eşiği), `jolt_world_step` (Jolt'un update hata bitlerini döndürür; adım, çağıran beklerken dünyanın 16 MB yığınlı kendi adım thread'inde çalışır, çünkü Jolt'un narrow phase'i bir Dart mutator thread'inin yığınından fazlasına ihtiyaç duyabilir), broad phase optimizasyonu, body sayıları.
 - **Şekiller** (referans sayımlı, `jolt_shape_release` ile bırakılır): kutu, küre, kapsül (Y ekseni), silindir (Y ekseni), convex hull, height field (satır öncelikli örnekler, `jolt_heightfield_no_collision()` delikleri, yaklaşık 1 mm hassasiyet), ölçekli, döndürülmüş/kaydırılmış, kütle merkezi kaydırılmış, static compound; `jolt_shape_set_user_data` temaslar ve ray isabetleri için bir yaprağı adlandırır.
 - **Body'ler**: `JoltBodySettings` ile `jolt_body_create` (hareket tipi, poz, hızlar, user data, sürtünme, sekme, sönüm, yerçekimi çarpanı, kütle ve atalet override'ı, izinli DOF'lar, sürekli çarpışma, sensör), silme, sahip ve profiller (filtreleme), combine modlu malzeme, şekil, kütle özellikleri, hareket tipi, sönüm, yerçekimi çarpanı, CCD, transform, hız, kinematik hareket, kuvvet, tork, impuls, aktivasyon; `jolt_world_get_body_states` birçok body'yi tek çağrıda okur (`JOLT_BODY_STATE_STRIDE` double: kütle merkezi, dönüş, doğrusal ve açısal hız, aktif, şekil orijini).
-- **Temaslar**: `jolt_world_get_contacts` son adımın eklenen ve süren temaslarını body sırasına göre döndürür: iki body ve yaprak user data'ları, ortalama nokta, normal (A body'sinden B'ye), Jolt'un tahmini normal impulsu (`EstimateCollisionResponse`), penetrasyon ve nokta sayısı.
+- **Temaslar**: `jolt_world_get_contacts` son adımın eklenen ve süren temaslarını body sırasına göre döndürür: iki body ve yaprak user data'ları, ortalama nokta, normal (A body'sinden B'ye), tahmini bir normal impuls (çözücü çalışmadan önceki hızlardan, body'lerin temasta yaklaşmasını esneklikle birlikte durduran, kütle merkezlerinden geçen impuls), penetrasyon ve nokta sayısı.
 - **Sorgular**: `jolt_world_cast_ray`.
 - **Constraint'ler**: `jolt_constraint_swing_twist` (çerçevenin X ekseni etrafında twist, düzlem ekseni Y, normal ve düzlem yarı konileri, twist aralığı, sürtünme torku) ve `jolt_constraint_hinge` (`-π ≤ min ≤ 0 ≤ max ≤ π` içinde limitler), çerçeveler her body'nin kütle merkezine göre; limitler, sürtünme torku, hız motoru (`jolt_constraint_set_velocity_motor`), konum motoru (`jolt_constraint_set_position_motor`: hedef dönüşe doğru frekansı ve sönüm oranı verilen bir yay; menteşe X etrafındaki açıyı okur), constraint'in adası için çözücü iterasyonları (`jolt_constraint_set_solver_steps`), etkinleştirme, impulslar.
 
@@ -82,7 +82,7 @@ Malzemeler: yüzeyler neredeyse kaymıyorsa (1 cm/s altı) statik sürtünme, ak
 
 ## Sınırlar
 
-- Temas impulsları Jolt'un o adım için tahminidir, çözülmüş impuls değildir.
+- Temas impulsları o adım için tahmindir (dönme terimleri yok), çözülmüş impulslar değildir.
 - Height field'lar blok başına örnek başına yaklaşık 8 bit tutar (metre ölçekli arazide birkaç milimetre) ve yalnızca static'tir.
 - Windows x64'te build edildi ve test edildi; Linux script'i aynısını yapar. Android, macOS, iOS ve web (WebAssembly) henüz build edilmiyor.
 

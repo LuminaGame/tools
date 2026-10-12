@@ -2,6 +2,12 @@
 
 #include "jolt_c.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
@@ -13,7 +19,6 @@
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
-#include <Jolt/Physics/Collision/EstimateCollisionResponse.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
@@ -33,7 +38,11 @@
 #include <Jolt/RegisterTypes.h>
 
 #include <algorithm>
+#include <condition_variable>
+#include <functional>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <thread>
@@ -48,8 +57,30 @@ namespace {
 
 std::once_flag g_init_once;
 
+#ifdef JPH_ENABLE_ASSERTS
+// A build of Jolt with asserts (diagnostics only) logs every failed assert to
+// stderr and to the file JOLT_ASSERT_LOG names, then continues.
+bool logAssert(const char* expression, const char* message, const char* file, uint line) {
+  char text[1024];
+  std::snprintf(text, sizeof(text), "Jolt assert: %s (%s) at %s:%u\n", expression, message != nullptr ? message : "",
+                file, line);
+  std::fputs(text, stderr);
+  std::fflush(stderr);
+  if (const char* path = std::getenv("JOLT_ASSERT_LOG")) {
+    if (FILE* f = std::fopen(path, "a")) {
+      std::fputs(text, f);
+      std::fclose(f);
+    }
+  }
+  return false;
+}
+#endif
+
 void ensureJolt() {
   std::call_once(g_init_once, [] {
+#ifdef JPH_ENABLE_ASSERTS
+    AssertFailed = logAssert;
+#endif
     RegisterDefaultAllocator();
     Factory::sInstance = new Factory();
     RegisterTypes();
@@ -151,6 +182,90 @@ void store(Vec3Arg v, float* out) {
 
 }  // namespace
 
+
+// --- Stepping thread -------------------------------------------------------------
+
+// Runs the world's steps on a thread of its own with a large stack. The narrow
+// phase (GJK/EPA, convex hull contacts) and the solver can use far more stack
+// than the thread that calls in has to spare: a Dart mutator thread runs with
+// a small stack whose neighbouring memory the VM owns, and a deep Jolt step on
+// it corrupted the VM. The caller blocks until the step is done.
+class Stepper {
+ public:
+  static constexpr size_t kStackBytes = 16u << 20;
+
+  Stepper() {
+#if defined(_WIN32)
+    handle_ = CreateThread(nullptr, kStackBytes, &Stepper::entry, this, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
+#else
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, kStackBytes);
+    pthread_create(&thread_, &attr, &Stepper::entryPosix, this);
+    pthread_attr_destroy(&attr);
+#endif
+  }
+
+  ~Stepper() {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      quit_ = true;
+    }
+    wake_.notify_all();
+#if defined(_WIN32)
+    WaitForSingleObject(handle_, INFINITE);
+    CloseHandle(handle_);
+#else
+    pthread_join(thread_, nullptr);
+#endif
+  }
+
+  /// Runs [work] on the stepping thread and returns when it finished.
+  void run(const std::function<void()>& work) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    work_ = &work;
+    finished_ = false;
+    wake_.notify_all();
+    done_.wait(lock, [this] { return finished_; });
+    work_ = nullptr;
+  }
+
+ private:
+  void loop() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (;;) {
+      wake_.wait(lock, [this] { return quit_ || (work_ != nullptr && !finished_); });
+      if (quit_) return;
+      const std::function<void()>* work = work_;
+      lock.unlock();
+      (*work)();
+      lock.lock();
+      finished_ = true;
+      done_.notify_all();
+    }
+  }
+
+#if defined(_WIN32)
+  static DWORD WINAPI entry(LPVOID self) {
+    static_cast<Stepper*>(self)->loop();
+    return 0;
+  }
+  HANDLE handle_ = nullptr;
+#else
+  static void* entryPosix(void* self) {
+    static_cast<Stepper*>(self)->loop();
+    return nullptr;
+  }
+  pthread_t thread_{};
+#endif
+  std::mutex mutex_;
+  std::condition_variable wake_;
+  std::condition_variable done_;
+  const std::function<void()>* work_ = nullptr;
+  bool finished_ = true;
+  bool quit_ = false;
+};
+
 // --- World ----------------------------------------------------------------------
 
 struct JoltShape {
@@ -165,6 +280,8 @@ struct JoltConstraint {
 struct JoltWorld : public ContactListener, public SimShapeFilter {
   std::unique_ptr<TempAllocatorImpl> temp;
   std::unique_ptr<JobSystem> jobs;
+  // The thread steps run on; stopped first in jolt_world_destroy.
+  std::unique_ptr<Stepper> stepper;
   LayerInterface layers;
   ObjectVsBroadPhaseFilter objectVsBroadPhase;
   ObjectPairFilter objectPair;
@@ -231,20 +348,24 @@ struct JoltWorld : public ContactListener, public SimShapeFilter {
                                            : combine(a->friction, b->friction, fMode);
       settings.mCombinedRestitution = combine(a->restitution, b->restitution, rMode);
     }
-    CollisionEstimationResult estimate;
-    EstimateCollisionResponse(body1, body2, manifold, estimate, settings.mCombinedFriction,
-                              settings.mCombinedRestitution);
     JoltContact c{};
     c.body_a = body1.GetID().GetIndexAndSequenceNumber();
     c.body_b = body2.GetID().GetIndexAndSequenceNumber();
     c.shape_a = uint32(body1.GetShape()->GetSubShapeUserData(manifold.mSubShapeID1));
     c.shape_b = uint32(body2.GetShape()->GetSubShapeUserData(manifold.mSubShapeID2));
     Vec3 point = Vec3::sZero();
-    float impulse = 0.0f;
     const uint count = manifold.mRelativeContactPointsOn1.size();
-    for (uint i = 0; i < count; ++i) {
-      point += Vec3(manifold.GetWorldSpaceContactPointOn1(i));
-      if (i < estimate.mContactImpulse.size()) impulse += estimate.mContactImpulse[i];
+    for (uint i = 0; i < count; ++i) point += Vec3(manifold.GetWorldSpaceContactPointOn1(i));
+    // The normal impulse that stops the bodies approaching at the contact
+    // (with restitution), through the centres of mass: an estimate for hit
+    // events, read from the two bodies only.
+    const float inv1 = body1.IsDynamic() ? body1.GetMotionProperties()->GetInverseMass() : 0.0f;
+    const float inv2 = body2.IsDynamic() ? body2.GetMotionProperties()->GetInverseMass() : 0.0f;
+    float impulse = 0.0f;
+    if (count > 0 && inv1 + inv2 > 0.0f) {
+      const RVec3 mean(point / float(count));
+      const float approach = (body2.GetPointVelocity(mean) - body1.GetPointVelocity(mean)).Dot(manifold.mWorldSpaceNormal);
+      if (approach < 0.0f) impulse = -(1.0f + settings.mCombinedRestitution) * approach / (inv1 + inv2);
     }
     if (count > 0) point /= float(count);
     store(point, c.point);
@@ -306,11 +427,13 @@ JoltWorld* jolt_world_create(const JoltWorldSettings* settings) {
   w->system.Init(maxBodies, 0, maxPairs, maxContacts, w->layers, w->objectVsBroadPhase, w->objectPair);
   w->system.SetContactListener(w);
   w->system.SetSimShapeFilter(w);
+  w->stepper = std::make_unique<Stepper>();
   return w;
 }
 
 void jolt_world_destroy(JoltWorld* world) {
   if (world == nullptr) return;
+  world->stepper.reset();
   for (JoltConstraint* c : world->constraints) {
     world->system.RemoveConstraint(c->constraint);
     delete c;
@@ -360,8 +483,9 @@ int32_t jolt_world_step(JoltWorld* world, float dt, int32_t collision_steps) {
     std::lock_guard<std::mutex> lock(world->contactsMutex);
     world->contacts.clear();
   }
-  const EPhysicsUpdateError error =
-      world->system.Update(dt, std::max(1, collision_steps), world->temp.get(), world->jobs.get());
+  EPhysicsUpdateError error = EPhysicsUpdateError::None;
+  const int steps = std::max(1, collision_steps);
+  world->stepper->run([&] { error = world->system.Update(dt, steps, world->temp.get(), world->jobs.get()); });
   // Contacts in body order, so the same input reports them the same way
   // whatever thread found them first.
   std::sort(world->contacts.begin(), world->contacts.end(), [](const JoltContact& x, const JoltContact& y) {
