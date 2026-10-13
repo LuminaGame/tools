@@ -2,13 +2,14 @@
 
 # lumina_smoke API
 
-`lumina_smoke` sınıf referansı: `package:lumina_smoke/lumina_smoke.dart` (artifact'ler, video kuralları ve probe, recorder'lar, encoder'lar), `package:lumina_smoke/flutter.dart` (`SmokeRecorder`, `SmokeCapture`) ve `package:lumina_smoke/report.dart` (`smokeReportMain`, `SmokeReportConfig`, generator, modeller ve dashboard sunucusu). Dosya yolları `lumina_smoke/` paket dizinine görelidir.
+`lumina_smoke` sınıf referansı: `package:lumina_smoke/lumina_smoke.dart` (artifact'ler, video kuralları ve probe, recorder'lar, encoder'lar), `package:lumina_smoke/flutter.dart` (`SmokeRecorder`, `SmokeCapture`, `SmokeTutor`, `SmokeTutorialOverlay`) ve `package:lumina_smoke/report.dart` (`smokeReportMain`, `SmokeReportConfig`, generator, modeller ve dashboard sunucusu). Dosya yolları `lumina_smoke/` paket dizinine görelidir.
 
 **Bu sayfada:**
 
 - [`lib/src/artifacts.dart`](#libsrcartifactsdart)
 - [`lib/src/flutter/capture.dart`](#libsrcfluttercapturedart)
 - [`lib/src/flutter/recorder.dart`](#libsrcflutterrecorderdart)
+- [`lib/src/flutter/tutorial.dart`](#libsrcfluttertutorialdart)
 - [`lib/src/png.dart`](#libsrcpngdart)
 - [`lib/src/report/ansi.dart`](#libsrcreportansidart)
 - [`lib/src/report/categories.dart`](#libsrcreportcategoriesdart)
@@ -131,6 +132,34 @@ Frames go straight to a temporary raw file (a 1600×1000 frame is 6 MB), at full
 | `typeText` | `Future<void> typeText(Finder field, String text, {Duration perCharacter = const Duration(milliseconds: 100)})...` | Types [text] into [field] the way a user does, one character at a time, with the field updating on video as it goes. Each prefix goes through [WidgetTester.enterText], so the field's `onChanged` fires per keystroke. |
 | `drag` | `Future<void> drag(Offset from, Offset to, {int steps = 30, PointerDeviceKind kind = PointerDeviceKind.mouse, i...` | Drags a pointer from [from] to [to] in [steps] moves, recording every step: the drag plays out on video at the pace a hand would move. |
 | `save` | `File save(String testName, {List<String>? usedAssets})` | Encodes the recording and saves it as [testName]'s video. Throws when it is shorter than [SmokeArtifacts.minimumVideoSeconds] or smaller than [SmokeArtifacts.minimumVideoWidth] × [SmokeArtifacts.minimumVideoHeight]. |
+
+## `lib/src/flutter/tutorial.dart`
+
+Kaydedilen bir eğitim: adım başlıkları ve sanal bir imleç, kaydedilen uygulamanın **içinde** çizilir (böylece pencere ve sınır yakalamaları onları kaydeder); girdi sanal kalır.
+
+### `class SmokeTutorialController`
+
+Katmanın çizdikleri: `caption`, `step` / `total` (rozet "3/30"), `progress` (bir adım beklerken dolan çubuk), `cursor` (global mantıksal piksel, null gizli), tıklama `ripple`'ı (`rippleAt`'te 0–1 evresi), kullanılan kontrolün etrafındaki `highlight` dikdörtgeni ve `tick` (çizilen kareler; başlıktaki canlı nokta onunla atar, böylece bekleyen bir adım da ekranda değişir). Ayarlayıcılar: `setCaption`, `setProgress`, `setCursor`, `setRipple`, `setHighlight`, `advance`.
+
+### `class SmokeTutorialOverlay`
+
+`SmokeTutorialOverlay({required controller, required child})`: uygulamayı kaydedilen `RepaintBoundary`'nin içinde sarar; üstüne başlık kutusunu (üst ortada, büyük yazı, adım rozeti ve çubuk), vurguyu, dalgayı ve bir ok imleci çizer; işaretçiler geçer.
+
+### `class SmokeTutor`
+
+`SmokeTutor(tester, recorder, controller, {total})` bir kaydı öğretme hızında yürütür; her bekleme kareleri çizer ve kaydeder.
+
+| Üye | Açıklama |
+|---|---|
+| `step(text, {read})` | Sonraki başlık; `readTime` (2.6 s) ya da `read` kadar tutulur. |
+| `hold(duration)` | Çizmeye ve kaydetmeye devam eder; başlığın çubuğu dolar. |
+| `moveTo(offset, {duration})` | İmleci kaydırır (yumuşak, 0.75 s). |
+| `point(finder)` | Kontrolü görünür kaydırır, çerçeveler, oraya gider. |
+| `click(finder, {after, doubleClick})` | Gösterir, dokunur (sanal fare dokunuşu; çift tıklama için iki kez), dalga çizer, `after` kadar bekler. |
+| `clickAt(offset, {after})` | Aynısı bir konumda (bir viewport noktası). |
+| `drag(from, to, {steps, buttons})` | İmlecin izlediği sanal fare sürüklemesi (gizmo tutamaçları; `kSecondaryButton` döndürür). |
+| `type(field, text)` | Alana tıklar ve karakter karakter yazar. |
+| `finish()` | İmleci ve vurguyu gizler. |
 
 ## `lib/src/png.dart`
 

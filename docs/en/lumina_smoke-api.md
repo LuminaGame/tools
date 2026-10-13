@@ -2,13 +2,14 @@
 
 # lumina_smoke API
 
-The class reference of `lumina_smoke`: `package:lumina_smoke/lumina_smoke.dart` (artifacts, video rules and probe, recorders, encoders), `package:lumina_smoke/flutter.dart` (`SmokeRecorder`, `SmokeCapture`) and `package:lumina_smoke/report.dart` (`smokeReportMain`, `SmokeReportConfig`, the generator, the models and the dashboard server). File paths are relative to the `lumina_smoke/` package directory.
+The class reference of `lumina_smoke`: `package:lumina_smoke/lumina_smoke.dart` (artifacts, video rules and probe, recorders, encoders), `package:lumina_smoke/flutter.dart` (`SmokeRecorder`, `SmokeCapture`, `SmokeTutor`, `SmokeTutorialOverlay`) and `package:lumina_smoke/report.dart` (`smokeReportMain`, `SmokeReportConfig`, the generator, the models and the dashboard server). File paths are relative to the `lumina_smoke/` package directory.
 
 **On this page:**
 
 - [`lib/src/artifacts.dart`](#libsrcartifactsdart)
 - [`lib/src/flutter/capture.dart`](#libsrcfluttercapturedart)
 - [`lib/src/flutter/recorder.dart`](#libsrcflutterrecorderdart)
+- [`lib/src/flutter/tutorial.dart`](#libsrcfluttertutorialdart)
 - [`lib/src/png.dart`](#libsrcpngdart)
 - [`lib/src/report/ansi.dart`](#libsrcreportansidart)
 - [`lib/src/report/categories.dart`](#libsrcreportcategoriesdart)
@@ -131,6 +132,34 @@ Frames go straight to a temporary raw file (a 1600×1000 frame is 6 MB), at full
 | `typeText` | `Future<void> typeText(Finder field, String text, {Duration perCharacter = const Duration(milliseconds: 100)})...` | Types [text] into [field] the way a user does, one character at a time, with the field updating on video as it goes. Each prefix goes through [WidgetTester.enterText], so the field's `onChanged` fires per keystroke. |
 | `drag` | `Future<void> drag(Offset from, Offset to, {int steps = 30, PointerDeviceKind kind = PointerDeviceKind.mouse, i...` | Drags a pointer from [from] to [to] in [steps] moves, recording every step: the drag plays out on video at the pace a hand would move. |
 | `save` | `File save(String testName, {List<String>? usedAssets})` | Encodes the recording and saves it as [testName]'s video. Throws when it is shorter than [SmokeArtifacts.minimumVideoSeconds] or smaller than [SmokeArtifacts.minimumVideoWidth] × [SmokeArtifacts.minimumVideoHeight]. |
+
+## `lib/src/flutter/tutorial.dart`
+
+A recorded tutorial: step captions and a virtual cursor drawn **inside** the recorded app (so the window and boundary captures record them), with input that stays virtual.
+
+### `class SmokeTutorialController`
+
+What the overlay draws: `caption`, `step` / `total` (the badge "3/30"), `progress` (the bar that fills while a step is held), `cursor` (global logical pixels, null hidden), the click `ripple` (phase 0–1 at `rippleAt`), the `highlight` rectangle around the control used, and `tick` (frames drawn; a live dot in the caption pulses with it, so a held step still changes on screen). Setters: `setCaption`, `setProgress`, `setCursor`, `setRipple`, `setHighlight`, `advance`.
+
+### `class SmokeTutorialOverlay`
+
+`SmokeTutorialOverlay({required controller, required child})`: wraps the app inside the recorded `RepaintBoundary` and paints the caption box (top centre, large type, step badge and bar), the highlight, the ripple and an arrow cursor over it; pointers pass through.
+
+### `class SmokeTutor`
+
+`SmokeTutor(tester, recorder, controller, {total})` drives a recording at a teaching pace; every wait renders and records frames.
+
+| Member | Description |
+|---|---|
+| `step(text, {read})` | The next caption, held for `readTime` (2.6 s) or `read`. |
+| `hold(duration)` | Keeps rendering and recording; the caption's bar fills. |
+| `moveTo(offset, {duration})` | Glides the cursor (eased, 0.75 s). |
+| `point(finder)` | Scrolls the control into view, outlines it, glides there. |
+| `click(finder, {after, doubleClick})` | Points, taps (virtual mouse tap, twice for a double click), ripples, holds `after`. |
+| `clickAt(offset, {after})` | The same at a position (a viewport point). |
+| `drag(from, to, {steps, buttons})` | A virtual mouse drag with the cursor following (gizmo handles; `kSecondaryButton` orbits). |
+| `type(field, text)` | Clicks the field and types one character at a time. |
+| `finish()` | Hides the cursor and highlight. |
 
 ## `lib/src/png.dart`
 
