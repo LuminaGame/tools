@@ -1,11 +1,11 @@
-import 'dart:ffi';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
 import 'package:vector_math/vector_math_64.dart';
 
-import 'package:flutter_jolt/src/jolt_bindings.g.dart' as b;
+import 'package:flutter_jolt/src/jolt_ffi.dart';
+import 'package:flutter_jolt/src/jolt_ffi_package.dart';
+import 'package:flutter_jolt/src/jolt_c.dart' as b;
 import 'package:flutter_jolt/src/jolt_physics.dart';
 import 'package:flutter_jolt/src/jolt_world.dart';
 

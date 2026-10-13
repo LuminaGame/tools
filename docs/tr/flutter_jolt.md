@@ -2,7 +2,7 @@
 
 # flutter_jolt
 
-`flutter_jolt`, [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (MIT) kütüphanesini Dart FFI ile bağlar: rigid body'ler, şekiller, constraint'ler, temaslar ve ray cast'lerle native bir fizik dünyası. Lumina motoru onu native masaüstünde fizik backend'i olarak kullanır (motorun `docs/tr/lumina/physics.md` sayfasına bakın); saf Dart çözücü web için ve yedek olarak kalır. Birimler Jolt'unkilerdir: metre, kilogram, saniye, radyan; dünyanın tercih ettiği bir yukarı ekseni yoktur. Dosya yolları `flutter_jolt/` paket klasörüne göredir.
+`flutter_jolt`, [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (MIT) kütüphanesini Dart FFI ile bağlar: rigid body'ler, şekiller, constraint'ler, temaslar ve ray cast'lerle native bir fizik dünyası. Lumina motoru onu native masaüstünde fizik backend'i olarak kullanır (motorun `docs/tr/lumina/physics.md` sayfasına bakın); web'de bir WebAssembly modülü olarak çalışır (aşağıda Web'e bakın); saf Dart çözücü yedek olarak kalır. Birimler Jolt'unkilerdir: metre, kilogram, saniye, radyan; dünyanın tercih ettiği bir yukarı ekseni yoktur. Dosya yolları `flutter_jolt/` paket klasörüne göredir.
 
 **Bu sayfada:**
 
@@ -10,6 +10,7 @@
 - [Native C köprüsü](#native-c-köprüsü)
 - [Dart API](#dart-api)
 - [Çarpışma filtreleme](#çarpışma-filtreleme)
+- [Web (WebAssembly)](#web-webassembly)
 - [Sınırlar](#sınırlar)
 
 ## Native build
@@ -86,11 +87,21 @@ Bir `SimShapeFilter` narrow phase'den önce karar verir; filtrelenen çiftler hi
 
 Malzemeler: yüzeyler neredeyse kaymıyorsa (1 cm/s altı) statik sürtünme, aksi halde dinamik sürtünme birleştirilir; iki body'nin büyük combine modu kazanır (average < min < multiply < max).
 
+## Web (WebAssembly)
+
+Web aynı C API'sini tek bir WebAssembly modülü olarak çalıştırır: `web/flutter_jolt.{js,wasm}` (gitignore'da):
+
+- **Build**: `tool/web/build_jolt_wasm.sh` (emsdk, varsayılan `~/emsdk` yoksa `EMSDK=...`, ve define yazıcı için `PATH`'te bir Dart SDK) sabitlenen Jolt sürümünü `third_party/jolt-wasm/` içine indirir, Jolt'un kendi wasm32 bayraklarıyla (`USE_WASM_SIMD`: Emscripten'in SSE 4.2 öykünmesiyle WASM SIMD, istisnasız) build eder ve `src/jolt_c.cpp`'yi modüle link eder: tek iş parçacıklı (`SharedArrayBuffer` yok, yani COOP/COEP başlıkları gerekmez), 16 MB yığın, büyüyen bellek, 64 bit değerler için BigInt, başlıktaki her `jolt_*` fonksiyonu dışa aktarılmış. `OPT=-O1` daha hızlı link eder. Emscripten altında bir dünya çağıran iş parçacığında Jolt'un tek iş parçacıklı iş sistemiyle adımlanır.
+- **Dart**: sarmalayıcılar `lib/src/jolt_ffi.dart`, `jolt_ffi_package.dart` ve `jolt_c.dart`'ı import eder; bunlar native'de `dart:ffi`, `package:ffi` ve ffigen bağlamalarını, web'de `lib/src/web_ffi/` (modülün belleği üzerinde bir `dart:ffi` / `package:ffi` katmanı, flutter_filament'inkinden uyarlandı) ile `lib/src/jolt_bindings.web.g.dart`'ı dışa aktarır. `dart run tool/ffigen_web.dart` o dosyayı ffigen çıktısından üretir (`tool/ffigen.dart`'tan sonra çalıştırın; aksi halde `test/web/bindings_lockstep_test.dart` başarısız olur).
+- **Açılış**: `await JoltPhysics.ensureInitialized(moduleUrl: 'flutter_jolt.js')` modülü yükler (native'de hiçbir şey yapmaz); o zamana kadar `JoltPhysics.isAvailable` false'tur. Lumina motoru bir web oyunu yüklenirken onu `LuminaPhysicsSubsystem.prepareJolt()` ile çağırır ve web build'i iki dosyayı oyunun `index.html`'inin yanına koyar.
+- **Testler**: `node --test test/web/module_test.mjs` (her export, bir kutu üzerinde duran bir küre); `test/web/browser_tests_test.dart`, `test/web/browser_main.dart`'ı dart2js ile derler, modülün yanında sunar ve dünya, şekil, constraint, kumaş ve geniş faz test dosyalarını `test/support/test_api.dart` üzerinden (native'de `flutter_test`, web'de küçük bir tarayıcı koşucusu) headless Chrome'da çalıştırır ve süreleri raporlar. Windows geliştirme makinesinde `flutter test --platform chrome` sayfasına hiç bağlanamıyor (önemsiz bir testte bile), bu yüzden süit Chrome'u kendisi sürer.
+- **Ölçülen** (Chrome 155, bu makine): modül 1.40 MB wasm ve 19 KB JavaScript'tir ve yaklaşık 40 ms'de yüklenir; 29 testin hepsi geçer; durmuş 200 kutuluk bir yığının bir adımı tek iş parçacığında yaklaşık 0.3 ms sürer.
+
 ## Sınırlar
 
 - Temas impulsları o adım için tahmindir (dönme terimleri yok), çözülmüş impulslar değildir.
 - Height field'lar blok başına örnek başına yaklaşık 8 bit tutar (metre ölçekli arazide birkaç milimetre) ve yalnızca static'tir.
-- Windows x64'te build edildi ve test edildi; Linux script'i aynısını yapar. Android, macOS, iOS ve web (WebAssembly) henüz build edilmiyor.
+- Windows x64 ve Linux x64'te (Ubuntu, clang 21) ve WebAssembly olarak (tek iş parçacıklı) build edildi ve test edildi; Android, macOS ve iOS henüz build edilmiyor.
 
 ---
 

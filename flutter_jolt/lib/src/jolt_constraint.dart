@@ -1,9 +1,8 @@
-import 'dart:ffi';
-
-import 'package:ffi/ffi.dart';
 import 'package:vector_math/vector_math_64.dart';
 
-import 'package:flutter_jolt/src/jolt_bindings.g.dart' as b;
+import 'package:flutter_jolt/src/jolt_ffi.dart';
+import 'package:flutter_jolt/src/jolt_ffi_package.dart';
+import 'package:flutter_jolt/src/jolt_c.dart' as b;
 import 'package:flutter_jolt/src/jolt_world.dart';
 
 /// A ball-and-socket joint with a swing cone and a twist range. Frames are in

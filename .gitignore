@@ -38,3 +38,5 @@ windows/packaging/dev/
 Thumbs.db
 flutter_jolt/third_party/jolt/
 flutter_jolt/third_party/jolt-*/
+flutter_jolt/web/flutter_jolt.js
+flutter_jolt/web/flutter_jolt.wasm

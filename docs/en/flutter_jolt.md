@@ -2,7 +2,7 @@
 
 # flutter_jolt
 
-`flutter_jolt` binds [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (MIT) through Dart FFI: a native physics world with rigid bodies, shapes, constraints, contacts and ray casts. The Lumina engine uses it as its physics backend on native desktop (see the engine's `docs/en/lumina/physics.md`); the pure-Dart solver stays for the web and as the fallback. Units are Jolt's: metres, kilograms, seconds, radians; the world has no preferred up axis. File paths are relative to the `flutter_jolt/` package directory.
+`flutter_jolt` binds [Jolt Physics](https://github.com/jrouwe/JoltPhysics) (MIT) through Dart FFI: a native physics world with rigid bodies, shapes, constraints, contacts and ray casts. The Lumina engine uses it as its physics backend on native desktop (see the engine's `docs/en/lumina/physics.md`); on the web it runs as a WebAssembly module (see Web below); the pure-Dart solver stays as the fallback. Units are Jolt's: metres, kilograms, seconds, radians; the world has no preferred up axis. File paths are relative to the `flutter_jolt/` package directory.
 
 **On this page:**
 
@@ -10,6 +10,7 @@
 - [Native C bridge](#native-c-bridge)
 - [Dart API](#dart-api)
 - [Collision filtering](#collision-filtering)
+- [Web (WebAssembly)](#web-webassembly)
 - [Limits](#limits)
 
 ## Native build
@@ -86,11 +87,21 @@ A `SimShapeFilter` decides before the narrow phase, so filtered pairs cost nothi
 
 Materials: friction combines static friction while the surfaces barely slide (under 1 cm/s) and dynamic friction otherwise; the larger combine mode of the two bodies wins (average < min < multiply < max).
 
+## Web (WebAssembly)
+
+The web runs the same C API as one WebAssembly module, `web/flutter_jolt.{js,wasm}` (gitignored):
+
+- **Build**: `tool/web/build_jolt_wasm.sh` (emsdk, default `~/emsdk` else `EMSDK=...`, and a Dart SDK on `PATH` for the defines writer) fetches the pinned Jolt release into `third_party/jolt-wasm/`, builds it with Jolt's own wasm32 flags (`USE_WASM_SIMD`: WASM SIMD with Emscripten's SSE 4.2 emulation, no exceptions) and links `src/jolt_c.cpp` into the module: single-threaded (no `SharedArrayBuffer`, so no COOP/COEP headers), a 16 MB stack, growing memory, BigInt for 64-bit values, every `jolt_*` function of the header exported. `OPT=-O1` links faster. Under Emscripten a world steps on the calling thread with Jolt's single-threaded job system.
+- **Dart**: wrappers import `lib/src/jolt_ffi.dart`, `jolt_ffi_package.dart` and `jolt_c.dart`, which export `dart:ffi`, `package:ffi` and the ffigen bindings natively and `lib/src/web_ffi/` (a `dart:ffi` / `package:ffi` layer over the module's heap, adapted from flutter_filament's) plus `lib/src/jolt_bindings.web.g.dart` on the web. `dart run tool/ffigen_web.dart` generates that file from the ffigen output (run it after `tool/ffigen.dart`; `test/web/bindings_lockstep_test.dart` fails otherwise).
+- **Start-up**: `await JoltPhysics.ensureInitialized(moduleUrl: 'flutter_jolt.js')` loads the module (natively a no-op); until then `JoltPhysics.isAvailable` is false. The Lumina engine calls it through `LuminaPhysicsSubsystem.prepareJolt()` while a web game loads, and its web build stages the two files next to the game's `index.html`.
+- **Tests**: `node --test test/web/module_test.mjs` (every export, a sphere resting on a box); `test/web/browser_tests_test.dart` compiles `test/web/browser_main.dart` with dart2js, serves it beside the module and runs the world, shape, constraint, cloth and broad phase test files in headless Chrome through `test/support/test_api.dart` (`flutter_test` natively, a small browser runner on the web), and reports the timings. On the Windows development machine `flutter test --platform chrome` never connects to its page (even a trivial test), so the suite drives Chrome itself.
+- **Measured** (Chrome 155, this machine): the module is 1.40 MB of wasm plus 19 KB of JavaScript and loads in about 40 ms; all 29 tests pass; a step of a settled pile of 200 boxes takes about 0.3 ms on one thread.
+
 ## Limits
 
 - Contact impulses are estimates for the step (no rotation terms), not the solved impulses.
 - Height fields keep about 8 bits per sample per block (a few millimetres on metre-scale terrain) and are static only.
-- Built and tested on Windows x64; the Linux script mirrors it. Android, macOS, iOS and the web (WebAssembly) are not built yet.
+- Built and tested on Windows x64 and Linux x64 (Ubuntu, clang 21) and as WebAssembly (single-threaded); Android, macOS and iOS are not built yet.
 
 ---
 

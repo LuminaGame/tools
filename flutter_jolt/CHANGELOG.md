@@ -17,6 +17,10 @@
   per-step skinning; cloths ignore their owner's bodies except colliders.
 - `JoltWorld.carryCloth`: carry a cloth along a rigid motion (inertia scale,
   teleports).
+- Web: `tool/web/build_jolt_wasm.sh` builds Jolt and the C wrapper as one
+  WebAssembly module (`web/flutter_jolt.{js,wasm}`); a `dart:ffi` layer over
+  its heap and generated web bindings (`tool/ffigen_web.dart`) run the same
+  Dart API; `JoltPhysics.ensureInitialized` loads it.
 - Broad phase proxies for scene queries: `addBoxProxy`, `setBoxProxy`,
   `broadPhaseRay`, `broadPhaseBoxCast`, `broadPhaseBox`.
 - `JoltWorld.setClothSelfCollision`: a cloth keeps a distance from its own

@@ -4,13 +4,14 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#else
+#elif !defined(__EMSCRIPTEN__)
 #include <pthread.h>
 #endif
 
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
+#include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
@@ -193,6 +194,15 @@ void store(Vec3Arg v, float* out) {
 
 // --- Stepping thread -------------------------------------------------------------
 
+#if defined(__EMSCRIPTEN__)
+// WebAssembly (single-threaded, no SharedArrayBuffer): the step runs on the
+// calling thread, whose stack the module sets large enough (STACK_SIZE in
+// tool/web/build_jolt_wasm.sh).
+class Stepper {
+ public:
+  void run(const std::function<void()>& work) { work(); }
+};
+#else
 // Runs the world's steps on a thread of its own with a large stack. The narrow
 // phase (GJK/EPA, convex hull contacts) and the solver can use far more stack
 // than the thread that calls in has to spare: a Dart mutator thread runs with
@@ -273,6 +283,7 @@ class Stepper {
   bool finished_ = true;
   bool quit_ = false;
 };
+#endif
 
 // --- World ----------------------------------------------------------------------
 
@@ -465,7 +476,12 @@ JoltWorld* jolt_world_create(const JoltWorldSettings* settings) {
 
   auto* w = new JoltWorld();
   w->temp = std::make_unique<TempAllocatorImpl>(tempBytes);
+#if defined(__EMSCRIPTEN__)
+  (void)threads;
+  w->jobs = std::make_unique<JobSystemSingleThreaded>(cMaxPhysicsJobs);
+#else
   w->jobs = std::make_unique<JobSystemThreadPool>(cMaxPhysicsJobs, cMaxPhysicsBarriers, threads);
+#endif
   w->system.Init(maxBodies, 0, maxPairs, maxContacts, w->layers, w->objectVsBroadPhase, w->objectPair);
   w->system.SetContactListener(w);
   w->system.SetSimShapeFilter(w);

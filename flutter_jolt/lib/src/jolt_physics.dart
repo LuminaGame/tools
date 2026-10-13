@@ -1,14 +1,29 @@
-import 'package:flutter_jolt/src/jolt_bindings.g.dart' as b;
+import 'package:flutter_jolt/src/jolt_c.dart' as b;
+import 'package:flutter_jolt/src/jolt_web_init.dart';
 
 /// The native Jolt Physics library: whether this process has it, and its
 /// version.
 ///
 /// The native-assets hook builds the library only when a Jolt build exists
 /// for the target (`tool/build_jolt.*`); without it every call into Jolt
-/// would throw, so callers check [isAvailable] first and fall back.
+/// would throw, so callers check [isAvailable] first and fall back. On the
+/// web the library is a WebAssembly module (`tool/web/build_jolt_wasm.sh`)
+/// that [ensureInitialized] loads; until then [isAvailable] is false.
 abstract final class JoltPhysics {
   static bool? _available;
   static int _version = 0;
+
+  /// Whether this is a web build (the WebAssembly module).
+  static const bool isWeb = joltIsWeb;
+
+  /// On the web, loads the WebAssembly module (`flutter_jolt.js` and
+  /// `flutter_jolt.wasm` from [moduleUrl]'s directory) and registers the
+  /// generated layouts; natively nothing (the library is linked). Afterwards
+  /// [isAvailable] answers again. Idempotent.
+  static Future<void> ensureInitialized({String moduleUrl = 'flutter_jolt.js'}) async {
+    await loadJoltModule(moduleUrl);
+    _available = null;
+  }
 
   /// Whether the native library is loaded and answers.
   static bool get isAvailable {
