@@ -26,7 +26,7 @@ Jolt is fetched, not vendored. `tool/jolt_version.txt` pins the release (tag `v5
 
 Build options: single precision, no cross-platform determinism (the same binary is deterministic, which replays and tests need), 16-bit object layers, C++ exceptions and RTTI on, no debug renderer, profiler, object stream or GPU compute, the x86-64 SSE4.2 baseline (no AVX, so games run on older CPUs), no link-time optimisation. `--clean` deletes the folder first.
 
-`hook/build.dart` compiles `src/jolt_c.cpp` into the `flutter_jolt` dynamic library (code asset `package:flutter_jolt/src/jolt_native.dart`) with exactly the defines in `jolt_defines.txt` and links the static library. The build folder comes from (`lib/src/hook/jolt_dir.dart`):
+`hook/build.dart` compiles `src/jolt_c.cpp` into the `flutter_jolt` dynamic library (code asset `package:flutter_jolt/src/jolt_native.dart`) with exactly the defines in `jolt_defines.txt` (on x64 with clang/gcc also the instruction-set flags they imply, `joltIsaFlags`: `-msse4.1`, `-msse4.2 -mpopcnt`, …, since Jolt's headers use those intrinsics inline) and links the static library. The build folder comes from (`lib/src/hook/jolt_dir.dart`):
 
 1. `LUMINA_JOLT_DIR` (only when the hook runs directly; the hooks runner forwards no `LUMINA_*` variables);
 2. the `jolt_dir` user-define in the app's workspace root pubspec (`hooks: user_defines: flutter_jolt: jolt_dir: <path>`), when it holds the library;

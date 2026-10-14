@@ -81,6 +81,8 @@ void main(List<String> args) async {
           '-O2',
           '-fPIC',
           '-w',
+          // The instruction sets Jolt was built with (SSE4.1/4.2 on x64).
+          if (input.config.code.targetArchitecture == Architecture.x64) ...joltIsaFlags(joltDefines),
           if (libcxx != null) ...[
             '-nostdinc++',
             '-isystem',

@@ -67,4 +67,11 @@ void main() {
       {'JPH_OBJECT_LAYER_BITS': '16', 'JPH_USE_SSE4_1': null},
     );
   });
+
+  test('the instruction-set flags follow the JPH_USE_* defines Jolt was built with', () {
+    expect(joltIsaFlags(parseJoltDefines('JPH_USE_SSE4_1\nJPH_USE_SSE4_2\nJPH_OBJECT_LAYER_BITS=16\n')),
+        ['-msse4.1', '-msse4.2', '-mpopcnt']);
+    expect(joltIsaFlags(parseJoltDefines('JPH_USE_AVX2\nJPH_USE_FMADD\n')), ['-mavx2', '-mfma']);
+    expect(joltIsaFlags(const {}), isEmpty, reason: 'a build without them (arm64) needs none');
+  });
 }

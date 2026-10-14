@@ -26,7 +26,7 @@ Jolt vendored değildir, indirilir. `tool/jolt_version.txt` sürümü sabitler (
 
 Build seçenekleri: tek hassasiyet, platformlar arası determinizm yok (aynı binary deterministiktir; replay ve testler için bu yeterli), 16 bit object layer, C++ exception ve RTTI açık, debug renderer, profiler, object stream ve GPU compute yok, x86-64 SSE4.2 tabanı (AVX yok, oyunlar eski CPU'larda da çalışır), link-time optimizasyon yok. `--clean` önce klasörü siler.
 
-`hook/build.dart`, `src/jolt_c.cpp` dosyasını `jolt_defines.txt` içindeki define'larla birebir derleyip `flutter_jolt` dinamik kütüphanesini (code asset `package:flutter_jolt/src/jolt_native.dart`) üretir ve static kütüphaneyi link eder. Build klasörü şuradan gelir (`lib/src/hook/jolt_dir.dart`):
+`hook/build.dart`, `src/jolt_c.cpp` dosyasını `jolt_defines.txt` içindeki define'larla birebir (x64'te clang/gcc ile bunların gerektirdiği komut seti bayraklarıyla da, `joltIsaFlags`: `-msse4.1`, `-msse4.2 -mpopcnt`, …; Jolt'un başlıkları bu intrinsic'leri satır içi kullanır) derleyip `flutter_jolt` dinamik kütüphanesini (code asset `package:flutter_jolt/src/jolt_native.dart`) üretir ve static kütüphaneyi link eder. Build klasörü şuradan gelir (`lib/src/hook/jolt_dir.dart`):
 
 1. `LUMINA_JOLT_DIR` (yalnızca hook doğrudan çalıştırıldığında; hook runner `LUMINA_*` değişkenlerini aktarmaz);
 2. uygulamanın workspace root pubspec'indeki `jolt_dir` user-define'ı (`hooks: user_defines: flutter_jolt: jolt_dir: <yol>`), kütüphaneyi içeriyorsa;

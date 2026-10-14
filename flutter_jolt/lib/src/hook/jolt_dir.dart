@@ -52,6 +52,22 @@ Map<String, String?> parseJoltDefines(String text) {
   return out;
 }
 
+/// The clang / gcc instruction-set flags Jolt's `JPH_USE_*` [defines]
+/// were built with (its CMake adds them next to the defines): Jolt's headers
+/// use those intrinsics inline, so code including them needs the same flags
+/// (MSVC needs none).
+List<String> joltIsaFlags(Map<String, String?> defines) => [
+      if (defines.containsKey('JPH_USE_SSE4_1')) '-msse4.1',
+      if (defines.containsKey('JPH_USE_SSE4_2')) ...['-msse4.2', '-mpopcnt'],
+      if (defines.containsKey('JPH_USE_AVX')) '-mavx',
+      if (defines.containsKey('JPH_USE_AVX2')) '-mavx2',
+      if (defines.containsKey('JPH_USE_AVX512')) ...['-mavx512f', '-mavx512vl', '-mavx512dq'],
+      if (defines.containsKey('JPH_USE_LZCNT')) '-mlzcnt',
+      if (defines.containsKey('JPH_USE_TZCNT')) '-mbmi',
+      if (defines.containsKey('JPH_USE_F16C')) '-mf16c',
+      if (defines.containsKey('JPH_USE_FMADD')) '-mfma',
+    ];
+
 /// [uri] as a `/`-separated path without a trailing slash.
 String joltDirPath(Uri uri) {
   final path = _filePath(uri).replaceAll(r'\', '/');
