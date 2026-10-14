@@ -8,7 +8,7 @@ import 'package:flutter_jolt/flutter_jolt.dart';
 /// Swing-twist and hinge constraints: anchors hold, cones and hinge limits
 /// hold, motors turn.
 void main() {
-  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue));
+  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue, reason: '${JoltPhysics.loadError}'));
 
   late JoltWorld world;
   late int anchor;

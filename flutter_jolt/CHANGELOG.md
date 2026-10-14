@@ -17,6 +17,9 @@
   per-step skinning; cloths ignore their owner's bodies except colliders.
 - `JoltWorld.carryCloth`: carry a cloth along a rigid motion (inertia scale,
   teleports).
+- Linux: the hook links the Jolt and libc++ archives after the wrapper
+  (they were linked in empty and the library failed to load) and with
+  `-z defs`; `JoltPhysics.loadError` says why the library is unavailable.
 - Web: `tool/web/build_jolt_wasm.sh` builds Jolt and the C wrapper as one
   WebAssembly module (`web/flutter_jolt.{js,wasm}`); a `dart:ffi` layer over
   its heap and generated web bindings (`tool/ffigen_web.dart`) run the same

@@ -13,7 +13,7 @@ void main() {
     expect(
       JoltPhysics.isAvailable,
       isTrue,
-      reason: 'build the Jolt library with tool/build_jolt.bat first',
+      reason: 'build the Jolt library with tool/build_jolt.bat or tool/build_jolt.sh first: ${JoltPhysics.loadError}',
     );
   });
 

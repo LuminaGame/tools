@@ -11,6 +11,7 @@ import 'package:flutter_jolt/src/jolt_web_init.dart';
 /// that [ensureInitialized] loads; until then [isAvailable] is false.
 abstract final class JoltPhysics {
   static bool? _available;
+  static String? _loadError;
   static int _version = 0;
 
   /// Whether this is a web build (the WebAssembly module).
@@ -23,6 +24,7 @@ abstract final class JoltPhysics {
   static Future<void> ensureInitialized({String moduleUrl = 'flutter_jolt.js'}) async {
     await loadJoltModule(moduleUrl);
     _available = null;
+    _loadError = null;
   }
 
   /// Whether the native library is loaded and answers.
@@ -32,11 +34,21 @@ abstract final class JoltPhysics {
     try {
       _version = b.jolt_version();
       _available = _version > 0;
-    } catch (_) {
+      if (!_available!) _loadError = 'jolt_version() returned $_version';
+    } catch (e) {
       // ArgumentError (no code asset for this target) or a failed load.
       _available = false;
+      _loadError = '$e';
     }
     return _available!;
+  }
+
+  /// Why [isAvailable] is false: the loader's message (no code asset for
+  /// this target, or the dynamic library failed to load and why); null while
+  /// the library is available or not asked yet.
+  static String? get loadError {
+    isAvailable;
+    return _loadError;
   }
 
   /// The Jolt release the library was built from, as `major.minor.patch`
@@ -55,7 +67,8 @@ abstract final class JoltPhysics {
       throw StateError(
         'The Jolt Physics native library is not available for this target. '
         'Build it with flutter_jolt/tool/build_jolt.bat (Windows) or '
-        'tool/build_jolt.sh (Linux), or set the jolt_dir user-define.',
+        'tool/build_jolt.sh (Linux), or set the jolt_dir user-define. '
+        '(${_loadError ?? 'not loaded'})',
       );
     }
   }

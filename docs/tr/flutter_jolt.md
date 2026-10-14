@@ -32,7 +32,7 @@ Build seçenekleri: tek hassasiyet, platformlar arası determinizm yok (aynı bi
 2. uygulamanın workspace root pubspec'indeki `jolt_dir` user-define'ı (`hooks: user_defines: flutter_jolt: jolt_dir: <yol>`), kütüphaneyi içeriyorsa;
 3. paketteki `third_party/jolt`.
 
-Hiçbiri kütüphane içermiyorsa hook bir not yazar ve **code asset üretmez**: paket yine derlenir, `JoltPhysics.isAvailable` false olur ve çağıranlar yedeğe geçer. Linux'ta hook paketli libc++'ı (`libcxx_dir`) ister.
+Hiçbiri kütüphane içermiyorsa hook bir not yazar ve **code asset üretmez**: paket yine derlenir, `JoltPhysics.isAvailable` false olur ve çağıranlar yedeğe geçer. Linux'ta hook paketli libc++'ı (`libcxx_dir`) ister. Linux ve Android'de Jolt ve libc++ arşivleri sarmalayıcının nesne dosyasından sonra link edilir (`libraries` olarak, böylece GNU ld sarmalayıcının ihtiyacını onlardan alır) ve `-z defs` ile, yani eksik bir sembol kütüphanenin çalışırken yüklenememesi yerine build'i başarısız kılar.
 
 ## Native C köprüsü
 
@@ -54,7 +54,7 @@ Hiçbiri kütüphane içermiyorsa hook bir not yazar ve **code asset üretmez**:
 
 `package:flutter_jolt/flutter_jolt.dart`:
 
-- `JoltPhysics`: `isAvailable` (kütüphaneyi bir kez yoklar, hiç hata fırlatmaz), `version` (`5.6.0`), `ensureAvailable()`.
+- `JoltPhysics`: `isAvailable` (kütüphaneyi bir kez yoklar, hiç hata fırlatmaz), `loadError` (neden false olduğu: code asset yok ya da yükleyicinin mesajı), `version` (`5.6.0`), `ensureAvailable()` (hatası `loadError`'ı söyler).
 - `JoltWorld({maxBodies, maxBodyPairs, maxContactConstraints, workerThreads, gravity})`: `gravity`, `solverSettings` (`JoltSolverSettings`), `step(dt, collisionSteps:)`, `createBody(shape, JoltBodySettings)` → body id, `destroyBody` (önce constraint'lerini kaldırır), `setBodyOwner`, `setBodyProfiles`, `setBodyMaterial`, `setBodyShape`, `setBodyMassProperties`, `setBodyMotionType`, `setBodyDamping`, `setBodyGravityFactor`, `setBodyContinuousCollision`, `setBodyTransform`, `setBodyVelocity`, `moveKinematic`, `addForce` / `addTorque` / `addImpulse` / `addAngularImpulse`, `activateBody` / `deactivateBody` / `isBodyActive`, `bodyMass`, `bodyState` / `readBodyStates` + `stateAt` / `stateBuffer`, `contacts()`, `castRay`, `setProfileMatrix`, `ignorePair`, `addSwingTwist` / `addHinge` / `removeConstraint` (bir `JoltConstraint`'in `setLimits`, `maxFrictionTorque`, `setVelocityMotor`, `setPositionMotor`, `setSolverSteps`, `enabled`, `lambdas` üyeleri vardır), `dispose()`.
 - `JoltShape`: `box`, `sphere`, `capsule`, `cylinder`, `convexHull`, `heightField`, `scaled`, `rotatedTranslated`, `offsetCenterOfMass`, `compound`; `userData`, `centerOfMass`, `volume`, `localBounds`, `release()` (unutulan bir şekli `NativeFinalizer` serbest bırakır).
 - Kumaş (`JoltWorldCloth` extension'ı, `lib/src/jolt_cloth.dart`): `createCloth(vertices, triangles, inverseMasses:, position:, rotation:, settings: JoltClothSettings(...))`, `clothVertexCount`, `clothVertices` (dünya konumları bir `Float32List`'e), `setClothVertex`, `setClothInverseMass`, `driveClothVertices`, `clothLocalVertices`, `applyClothWind`; `JoltClothBend`, `JoltClothTethers`.

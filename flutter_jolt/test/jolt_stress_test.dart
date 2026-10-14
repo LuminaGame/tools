@@ -10,7 +10,7 @@ import 'package:flutter_jolt/flutter_jolt.dart';
 /// profiles, ignored pairs, contacts read every step and the world disposed
 /// while bodies still touch: nothing crashes and nothing becomes NaN.
 void main() {
-  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue));
+  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue, reason: '${JoltPhysics.loadError}'));
 
   test(
     'twenty jointed chains on worker threads stay finite and dispose cleanly',

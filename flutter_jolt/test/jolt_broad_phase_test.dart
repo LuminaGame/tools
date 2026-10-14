@@ -7,7 +7,7 @@ import 'package:flutter_jolt/flutter_jolt.dart';
 /// found by the segments and boxes that cross their bounds, moved and
 /// resized in place, gone once destroyed.
 void main() {
-  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue));
+  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue, reason: '${JoltPhysics.loadError}'));
 
   test('a ray and a box find the proxies whose bounds they cross', () {
     final world = JoltWorld(workerThreads: 0);

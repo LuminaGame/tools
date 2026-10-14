@@ -90,18 +90,27 @@ void main(List<String> args) async {
             '-isystem',
             '$libcxx/usr/lib/llvm-21/include',
           ],
-          library,
-          if (libcxx != null) ...[
-            '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++.a',
-            '$libcxx/usr/lib/${_linuxTriplet(input)}/libc++abi.a',
-          ],
-          if (targetOS == OS.macOS || targetOS == OS.iOS) ...[
-            '-lc++',
-            '-lc++abi',
-          ],
-          if (targetOS == OS.android) '-lc++_shared',
-          if (targetOS == OS.linux) ...['-ldl', '-lpthread'],
+          // A library with an unresolved symbol fails to link here instead
+          // of failing to load at run time.
+          // ld64 resolves archives wherever they are named.
+          if (targetOS == OS.macOS || targetOS == OS.iOS) library,
+          if (targetOS == OS.linux || targetOS == OS.android) '-Wl,-z,defs',
         ],
+      ],
+      // The archives after the wrapper's object: GNU ld takes from an
+      // archive only what the objects before it need, so Jolt and libc++
+      // named among the flags (ahead of the source) were linked in empty
+      // and the library failed to load on Linux.
+      libraryDirectories: [
+        if (targetOS == OS.linux || targetOS == OS.android) '$joltDir/lib',
+        if (libcxx != null) '$libcxx/usr/lib/${_linuxTriplet(input)}',
+      ],
+      libraries: [
+        if (targetOS == OS.linux || targetOS == OS.android) ':$staticLib',
+        if (libcxx != null) ...[':libc++.a', ':libc++abi.a'],
+        if (targetOS == OS.macOS || targetOS == OS.iOS) ...['c++', 'c++abi'],
+        if (targetOS == OS.android) 'c++_shared',
+        if (targetOS == OS.linux) ...['dl', 'pthread', 'm'],
       ],
     );
     await cbuilder.run(

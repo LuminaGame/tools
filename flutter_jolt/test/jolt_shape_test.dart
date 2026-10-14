@@ -9,7 +9,7 @@ import 'package:flutter_jolt/flutter_jolt.dart';
 /// Shapes: sizes, volumes, centres of mass, convex hulls, height fields and
 /// compounds as Jolt builds them.
 void main() {
-  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue));
+  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue, reason: '${JoltPhysics.loadError}'));
 
   test('primitive volumes', () {
     final box = JoltShape.box(Vector3(1, 2, 3));

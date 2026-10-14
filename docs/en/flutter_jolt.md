@@ -32,7 +32,7 @@ Build options: single precision, no cross-platform determinism (the same binary 
 2. the `jolt_dir` user-define in the app's workspace root pubspec (`hooks: user_defines: flutter_jolt: jolt_dir: <path>`), when it holds the library;
 3. `third_party/jolt` in the package.
 
-When none holds a library the hook prints a note and emits **no code asset**: the package still compiles, `JoltPhysics.isAvailable` is false and callers fall back. On Linux the hook requires the bundled libc++ (`libcxx_dir`).
+When none holds a library the hook prints a note and emits **no code asset**: the package still compiles, `JoltPhysics.isAvailable` is false and callers fall back. On Linux the hook requires the bundled libc++ (`libcxx_dir`). On Linux and Android the Jolt and libc++ archives are linked after the wrapper's object (as `libraries`, so GNU ld takes what the wrapper needs from them) with `-z defs`, so a missing symbol fails the build instead of the library failing to load.
 
 ## Native C bridge
 
@@ -54,7 +54,7 @@ When none holds a library the hook prints a note and emits **no code asset**: th
 
 `package:flutter_jolt/flutter_jolt.dart`:
 
-- `JoltPhysics`: `isAvailable` (probes the library once, never throws), `version` (`5.6.0`), `ensureAvailable()`.
+- `JoltPhysics`: `isAvailable` (probes the library once, never throws), `loadError` (why it is false: no code asset, or the loader's message), `version` (`5.6.0`), `ensureAvailable()` (its error names `loadError`).
 - `JoltWorld({maxBodies, maxBodyPairs, maxContactConstraints, workerThreads, gravity})`: `gravity`, `solverSettings` (`JoltSolverSettings`), `step(dt, collisionSteps:)`, `createBody(shape, JoltBodySettings)` → body id, `destroyBody` (removes its constraints first), `setBodyOwner`, `setBodyProfiles`, `setBodyMaterial`, `setBodyShape`, `setBodyMassProperties`, `setBodyMotionType`, `setBodyDamping`, `setBodyGravityFactor`, `setBodyContinuousCollision`, `setBodyTransform`, `setBodyVelocity`, `moveKinematic`, `addForce` / `addTorque` / `addImpulse` / `addAngularImpulse`, `activateBody` / `deactivateBody` / `isBodyActive`, `bodyMass`, `bodyState` / `readBodyStates` + `stateAt` / `stateBuffer`, `contacts()`, `castRay`, `setProfileMatrix`, `ignorePair`, `addSwingTwist` / `addHinge` / `removeConstraint` (a `JoltConstraint` has `setLimits`, `maxFrictionTorque`, `setVelocityMotor`, `setPositionMotor`, `setSolverSteps`, `enabled`, `lambdas`), `dispose()`.
 - `JoltShape`: `box`, `sphere`, `capsule`, `cylinder`, `convexHull`, `heightField`, `scaled`, `rotatedTranslated`, `offsetCenterOfMass`, `compound`; `userData`, `centerOfMass`, `volume`, `localBounds`, `release()` (a `NativeFinalizer` frees a forgotten shape).
 - Cloth (`JoltWorldCloth` extension, `lib/src/jolt_cloth.dart`): `createCloth(vertices, triangles, inverseMasses:, position:, rotation:, settings: JoltClothSettings(...))`, `clothVertexCount`, `clothVertices` (world positions into a `Float32List`), `setClothVertex`, `setClothInverseMass`, `driveClothVertices`, `clothLocalVertices`, `applyClothWind`; `JoltClothBend`, `JoltClothTethers`.

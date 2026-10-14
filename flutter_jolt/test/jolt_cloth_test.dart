@@ -9,7 +9,7 @@ import 'package:flutter_jolt/flutter_jolt.dart';
 /// Cloth soft bodies: a pinned sheet hangs without stretching, a dropped
 /// sheet drapes over a box, wind blows a free edge downwind.
 void main() {
-  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue));
+  setUpAll(() => expect(JoltPhysics.isAvailable, isTrue, reason: '${JoltPhysics.loadError}'));
 
   /// An [n] x [n] grid [size] m wide in the XZ plane, centred on the origin,
   /// and its triangles.
