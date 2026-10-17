@@ -12,6 +12,9 @@ enum MouseCaptureBackendKind {
   /// capture centre.
   windows,
 
+  /// macOS CoreGraphics cursor dissociation + NSEvent relative deltas.
+  macos,
+
   /// The platform has no way to capture the pointer (or the plugin is not
   /// built into this app).
   unsupported,

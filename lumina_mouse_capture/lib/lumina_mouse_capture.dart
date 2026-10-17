@@ -91,7 +91,9 @@ abstract final class LuminaMouseCapture {
     }
     if (isWeb) return const MouseCaptureBackendChoice._('web', false);
     final target = platform ?? defaultTargetPlatform;
-    if (target != TargetPlatform.linux && target != TargetPlatform.windows) {
+    if (target != TargetPlatform.linux &&
+        target != TargetPlatform.windows &&
+        target != TargetPlatform.macOS) {
       return const MouseCaptureBackendChoice._('unsupported platform', false);
     }
     return const MouseCaptureBackendChoice._('platform channel', true);

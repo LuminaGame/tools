@@ -32,7 +32,7 @@ void main() {
       }
     });
 
-    test('the web and other platforms get the recording backend; Linux and Windows get the platform channel', () {
+    test('the web and mobile platforms get the recording backend; Linux, macOS and Windows get the platform channel', () {
       expect(
         LuminaMouseCapture.chooseDefault(environment: const {}, isTestBinding: false, isWeb: true).reason,
         'web',
@@ -41,12 +41,12 @@ void main() {
         LuminaMouseCapture.chooseDefault(
           environment: const {},
           isTestBinding: false,
-          platform: TargetPlatform.macOS,
+          platform: TargetPlatform.android,
           isWeb: false,
         ).reason,
         'unsupported platform',
       );
-      for (final platform in [TargetPlatform.linux, TargetPlatform.windows]) {
+      for (final platform in [TargetPlatform.linux, TargetPlatform.macOS, TargetPlatform.windows]) {
         final choice = LuminaMouseCapture.chooseDefault(
           environment: const {},
           isTestBinding: false,

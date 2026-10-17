@@ -23,5 +23,7 @@ flutter:
     platforms:
       linux:
         pluginClass: LuminaMouseCapturePlugin
+      macos:
+        pluginClass: LuminaMouseCapturePlugin
       windows:
         pluginClass: LuminaMouseCapturePluginCApi

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Linux counterpart of build_jolt.bat: fetches the pinned Jolt Physics release
+# Unix counterpart of build_jolt.bat: fetches the pinned Jolt Physics release
 # (tool/jolt_version.txt) into third_party/jolt/src and builds it as a static
-# library with clang against the bundled libc++ (flutter_filament's
-# third_party/libcxx, like the other native packages), -fPIC. Writes:
+# library with clang (against the bundled libc++ on Linux, system libc++ on
+# macOS), -fPIC. Writes:
 #   third_party/jolt/include/Jolt/...   the headers
 #   third_party/jolt/lib/libJolt.a      the static library
 #   third_party/jolt/jolt_defines.txt   the JPH_* defines Jolt was built with
@@ -12,11 +12,17 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOLT_DIR="$DIR/third_party/jolt"
 SRC_DIR="$JOLT_DIR/src"
-BUILD_DIR="$JOLT_DIR/build-linux"
+OS="$(uname -s)"
+JOBS="$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)"
+if [ "$OS" = "Darwin" ]; then
+  BUILD_DIR="$JOLT_DIR/build-macos"
+else
+  BUILD_DIR="$JOLT_DIR/build-linux"
+fi
 LIBCXX_DIR="${LUMINA_LIBCXX_DIR:-$DIR/../../lumina/flutter_filament/third_party/libcxx}"
 case "$(uname -m)" in
-  aarch64 | arm64) TRIPLET=aarch64-linux-gnu; X86=OFF ;;
-  *) TRIPLET=x86_64-linux-gnu; X86=ON ;;
+  aarch64 | arm64) TRIPLET=aarch64-linux-gnu; X86=OFF; OSX_ARCH=arm64 ;;
+  *) TRIPLET=x86_64-linux-gnu; X86=ON; OSX_ARCH=x86_64 ;;
 esac
 
 JOLT_TAG="$(awk '$1 == "tag" { print $2 }' "$DIR/tool/jolt_version.txt")"
@@ -33,12 +39,26 @@ if [ "$HEAD_COMMIT" != "$JOLT_COMMIT" ]; then
   echo "Jolt checkout is at $HEAD_COMMIT, expected $JOLT_COMMIT ($JOLT_TAG). Run with --clean." >&2
   exit 1
 fi
-if [ ! -d "$LIBCXX_DIR/usr/lib/llvm-21/include/c++/v1" ]; then
-  echo "The bundled libc++ is missing at $LIBCXX_DIR (set LUMINA_LIBCXX_DIR)." >&2
-  exit 1
+
+CMAKE_EXTRA_ARGS=()
+if [ "$OS" = "Darwin" ]; then
+  echo "Building Jolt Physics $JOLT_TAG static library for macOS ($OSX_ARCH) with clang and system libc++..."
+  CMAKE_EXTRA_ARGS+=(
+    "-DCMAKE_OSX_ARCHITECTURES=$OSX_ARCH"
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC"
+  )
+else
+  if [ ! -d "$LIBCXX_DIR/usr/lib/llvm-21/include/c++/v1" ]; then
+    echo "The bundled libc++ is missing at $LIBCXX_DIR (set LUMINA_LIBCXX_DIR)." >&2
+    exit 1
+  fi
+  echo "Building Jolt Physics $JOLT_TAG static library with clang and the bundled libc++..."
+  CMAKE_EXTRA_ARGS+=(
+    -DCMAKE_CXX_FLAGS="-O2 -fPIC -nostdinc++ -Wno-unused-command-line-argument -isystem $LIBCXX_DIR/usr/lib/llvm-21/include/c++/v1 -isystem $LIBCXX_DIR/usr/lib/llvm-21/include"
+    -DCMAKE_EXE_LINKER_FLAGS="-L$LIBCXX_DIR/usr/lib/$TRIPLET"
+  )
 fi
 
-echo "Building Jolt Physics $JOLT_TAG static library with clang and the bundled libc++..."
 CC=clang CXX=clang++ cmake -S "$SRC_DIR/Build" -B "$BUILD_DIR" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
@@ -62,15 +82,14 @@ CC=clang CXX=clang++ cmake -S "$SRC_DIR/Build" -B "$BUILD_DIR" -G Ninja \
   -DENABLE_OBJECT_STREAM=OFF -DENABLE_INSTALL=OFF \
   -DTARGET_UNIT_TESTS=OFF -DTARGET_HELLO_WORLD=OFF -DTARGET_PERFORMANCE_TEST=OFF \
   -DTARGET_SAMPLES=OFF -DTARGET_VIEWER=OFF \
-  -DCMAKE_CXX_FLAGS="-O2 -fPIC -nostdinc++ -Wno-unused-command-line-argument -isystem $LIBCXX_DIR/usr/lib/llvm-21/include/c++/v1 -isystem $LIBCXX_DIR/usr/lib/llvm-21/include" \
-  -DCMAKE_EXE_LINKER_FLAGS="-L$LIBCXX_DIR/usr/lib/$TRIPLET"
-cmake --build "$BUILD_DIR" --target Jolt -j"$(nproc)"
+  "${CMAKE_EXTRA_ARGS[@]}"
+cmake --build "$BUILD_DIR" --target Jolt -j"$JOBS"
 
 mkdir -p "$JOLT_DIR/lib"
 cp "$BUILD_DIR/libJolt.a" "$JOLT_DIR/lib/libJolt.a"
 rm -rf "$JOLT_DIR/include"
 mkdir -p "$JOLT_DIR/include"
-(cd "$SRC_DIR" && find Jolt \( -name '*.h' -o -name '*.inl' \) -exec cp --parents {} "$JOLT_DIR/include/" \;)
+(cd "$SRC_DIR" && find Jolt \( -name '*.h' -o -name '*.inl' \) | tar -cf - -T - | tar -xf - -C "$JOLT_DIR/include")
 dart "$DIR/tool/write_jolt_defines.dart" "$BUILD_DIR/compile_commands.json" "$JOLT_DIR/jolt_defines.txt"
 printf 'tag %s\ncommit %s\n' "$JOLT_TAG" "$JOLT_COMMIT" > "$JOLT_DIR/VERSION"
 echo "Jolt Physics $JOLT_TAG built at $JOLT_DIR"
