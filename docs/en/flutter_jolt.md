@@ -15,7 +15,7 @@
 
 ## Native build
 
-Jolt is fetched, not vendored. `tool/jolt_version.txt` pins the release (tag `v5.6.0` and its commit); `tool/build_jolt.bat` (Windows, Visual Studio 2022, CMake and Ninja from Visual Studio) and `tool/build_jolt.sh` (Linux, clang with the bundled libc++ of the lumina repo, `-fPIC`) clone it into the gitignored `third_party/jolt/src`, refuse any other commit, build the `Jolt` static library and write a self-contained build folder:
+Jolt is fetched, not vendored. `tool/jolt_version.txt` pins the release (tag `v5.6.0` and its commit); `tool/build_jolt.bat` (Windows, Visual Studio 2022, CMake and Ninja from Visual Studio) and `tool/build_jolt.sh` (Linux: clang with the bundled libc++ of the lumina repo, `-fPIC`; macOS: clang with the system libc++, for the host architecture) clone it into the gitignored `third_party/jolt/src`, refuse any other commit, build the `Jolt` static library and write a self-contained build folder:
 
 | Path | Content |
 |---|---|
@@ -101,7 +101,7 @@ The web runs the same C API as one WebAssembly module, `web/flutter_jolt.{js,was
 
 - Contact impulses are estimates for the step (no rotation terms), not the solved impulses.
 - Height fields keep about 8 bits per sample per block (a few millimetres on metre-scale terrain) and are static only.
-- Built and tested on Windows x64 and Linux x64 (Ubuntu, clang 21) and as WebAssembly (single-threaded); Android, macOS and iOS are not built yet.
+- Built and tested on Windows x64 and Linux x64 (Ubuntu, clang 21) and as WebAssembly (single-threaded); `build_jolt.sh` also builds on macOS (the release workflow's disabled macOS job packages it as `jolt-macos-arm64.tar.gz`); Android and iOS are not built yet.
 
 ---
 

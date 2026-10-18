@@ -21,6 +21,7 @@ dependencies:
 - **Wayland**: `zwp_pointer_constraints_v1.lock_pointer` (one-shot) and `zwp_relative_pointer_v1.relative_motion`, bound on GDK's own Wayland connection.
 - **X11**: a seat grab on the toplevel window, a warp to the centre, and a 4 ms poll that reads the offset and warps back.
 - **Windows**: raw mouse input (`WM_INPUT`) for the motion, with the cursor hidden and clipped (`ClipCursor`) to one pixel at the capture centre; focus loss, minimise and closing the window give it back.
+- **macOS**: the cursor is warped to the capture centre, detached from the mouse (`CGAssociateMouseAndMouseCursorPosition`) and hidden; a local `NSEvent` monitor reports the mouse's deltas. The window resigning key, the app resigning active, minimising and closing the window give it back.
 - **Other platforms and the web**: no capture; the recording backend answers instead.
 
 The Linux implementation (`linux/`, GTK) needs GTK 3 and, for Wayland pointer lock, `wayland-client`, `wayland-scanner` and `wayland-protocols` (pointer-constraints and relative-pointer). Without them the plugin still builds and reports no Wayland support.
@@ -96,7 +97,7 @@ Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA
 
 #### `enum MouseCaptureBackendKind`
 
-`wayland` (pointer constraints and relative pointer on GDK's connection), `x11` (seat grab with warp-to-centre), `windows` (raw input with the cursor hidden and clipped to the capture centre), `unsupported` (no way to capture, or the plugin is not built into this app), `disabled` (the native side refused because `LUMINA_MOUSE_CAPTURE` is `off` or `record`), `recording` (requests are recorded, the pointer is never touched).
+`wayland` (pointer constraints and relative pointer on GDK's connection), `x11` (seat grab with warp-to-centre), `windows` (raw input with the cursor hidden and clipped to the capture centre), `macos` (the cursor detached from the mouse and hidden at the capture centre, deltas from `NSEvent`), `unsupported` (no way to capture, or the plugin is not built into this app), `disabled` (the native side refused because `LUMINA_MOUSE_CAPTURE` is `off` or `record`), `recording` (requests are recorded, the pointer is never touched).
 
 #### `class MouseCaptureSupport`
 
@@ -106,13 +107,13 @@ Which backend `chooseDefault` picked, and why: `reason` (`test binding`, `LUMINA
 
 - `MouseCaptureMotion(dx, dy)`: the mouse moved by (`dx`, `dy`) logical pixels while captured, however far the held pointer is from any edge.
 - `MouseCaptureLocked()`: the platform confirmed the lock (Wayland's `locked` event).
-- `MouseCaptureLost([String? reason])`: the capture ended without being asked: the window lost focus, the compositor broke the lock, or the window went away. `reason` is `focus`, `minimized` or `window` on Windows, null on Linux; it takes part in equality.
+- `MouseCaptureLost([String? reason])`: the capture ended without being asked: the window lost focus, the compositor broke the lock, or the window went away. `reason` is `focus`, `minimized` or `window` on Windows and macOS, null on Linux; it takes part in equality.
 
 ### `lib/src/method_channel_backend.dart`
 
 #### `class MethodChannelMouseCaptureBackend`
 
-The native backend (`linux/lumina_mouse_capture_plugin.cc`, `windows/lumina_mouse_capture_plugin.cpp`). The `lumina_mouse_capture` method channel answers `support` with `{kind, pointerLock, relativeMotion, detail}`, `capture` with a bool (optional `{x, y}`), and `release`; the `lumina_mouse_capture/events` event channel sends `{type: motion, dx, dy}`, `{type: locked}` and `{type: lost}` (Windows adds `reason`). A missing plugin (an app that was not rebuilt, a platform without it) is reported as `unsupported`, never thrown.
+The native backend (`linux/lumina_mouse_capture_plugin.cc`, `windows/lumina_mouse_capture_plugin.cpp`, `macos/lumina_mouse_capture/Sources/lumina_mouse_capture/LuminaMouseCapturePlugin.swift`). The `lumina_mouse_capture` method channel answers `support` with `{kind, pointerLock, relativeMotion, detail}`, `capture` with a bool (optional `{x, y}`), and `release`; the `lumina_mouse_capture/events` event channel sends `{type: motion, dx, dy}`, `{type: locked}` and `{type: lost}` (Windows and macOS add `reason`). A missing plugin (an app that was not rebuilt, a platform without it) is reported as `unsupported`, never thrown.
 
 ### `lib/src/recording_backend.dart`
 

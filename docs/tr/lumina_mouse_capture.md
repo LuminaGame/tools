@@ -21,6 +21,7 @@ dependencies:
 - **Wayland**: GDK'nın kendi Wayland bağlantısı üzerinde `zwp_pointer_constraints_v1.lock_pointer` (one-shot) ve `zwp_relative_pointer_v1.relative_motion`.
 - **X11**: toplevel pencerede seat grab, merkeze warp ve offset'i okuyup geri warp eden 4 ms'lik bir poll.
 - **Windows**: hareket için raw mouse input (`WM_INPUT`); imleç gizlenir ve capture merkezinde bir piksele clip edilir (`ClipCursor`); focus kaybı, minimize ve pencerenin kapanması pointer'ı geri verir.
+- **macOS**: imleç capture merkezine warp edilir, mouse'tan ayrılır (`CGAssociateMouseAndMouseCursorPosition`) ve gizlenir; yerel bir `NSEvent` monitörü mouse'un hareketlerini bildirir. Pencerenin key olmaktan çıkması, uygulamanın aktifliğini kaybetmesi, minimize ve pencerenin kapanması pointer'ı geri verir.
 - **Diğer platformlar ve web**: capture yok; yerine recording backend cevap verir.
 
 Linux implementasyonu (`linux/`, GTK) GTK 3 ve Wayland pointer lock için `wayland-client`, `wayland-scanner` ve `wayland-protocols` (pointer-constraints ve relative-pointer) gerektirir. Bunlar yoksa plugin yine build olur ve Wayland desteği olmadığını bildirir.
@@ -96,7 +97,7 @@ Process genelindeki mouse capture seam'i.
 
 #### `enum MouseCaptureBackendKind`
 
-`wayland` (GDK bağlantısı üzerinde pointer constraints ve relative pointer), `x11` (merkeze warp'lı seat grab), `windows` (imleci gizlenip capture merkezine clip edilen raw input), `unsupported` (capture yolu yok ya da plugin bu uygulamaya build edilmemiş), `disabled` (`LUMINA_MOUSE_CAPTURE` `off` ya da `record` olduğu için native taraf reddetti), `recording` (istekler kaydedilir, pointer'a hiç dokunulmaz).
+`wayland` (GDK bağlantısı üzerinde pointer constraints ve relative pointer), `x11` (merkeze warp'lı seat grab), `windows` (imleci gizlenip capture merkezine clip edilen raw input), `macos` (capture merkezinde mouse'tan ayrılıp gizlenen imleç, hareketler `NSEvent`'ten), `unsupported` (capture yolu yok ya da plugin bu uygulamaya build edilmemiş), `disabled` (`LUMINA_MOUSE_CAPTURE` `off` ya da `record` olduğu için native taraf reddetti), `recording` (istekler kaydedilir, pointer'a hiç dokunulmaz).
 
 #### `class MouseCaptureSupport`
 
@@ -106,13 +107,13 @@ Process genelindeki mouse capture seam'i.
 
 - `MouseCaptureMotion(dx, dy)`: capture sırasında mouse (`dx`, `dy`) logical piksel hareket etti; tutulan pointer'ın kenarlara uzaklığından bağımsızdır.
 - `MouseCaptureLocked()`: platform lock'u onayladı (Wayland'in `locked` event'i).
-- `MouseCaptureLost([String? reason])`: capture istenmeden bitti: pencere focus'u kaybetti, compositor lock'u kırdı ya da pencere kapandı. `reason` Windows'ta `focus`, `minimized` ya da `window`, Linux'ta null'dır; eşitliğe dahildir.
+- `MouseCaptureLost([String? reason])`: capture istenmeden bitti: pencere focus'u kaybetti, compositor lock'u kırdı ya da pencere kapandı. `reason` Windows ve macOS'ta `focus`, `minimized` ya da `window`, Linux'ta null'dır; eşitliğe dahildir.
 
 ### `lib/src/method_channel_backend.dart`
 
 #### `class MethodChannelMouseCaptureBackend`
 
-Native backend (`linux/lumina_mouse_capture_plugin.cc`, `windows/lumina_mouse_capture_plugin.cpp`). `lumina_mouse_capture` method channel'ı `support`'a `{kind, pointerLock, relativeMotion, detail}`, `capture`'a bir bool (isteğe bağlı `{x, y}`) ile ve `release`'e cevap verir; `lumina_mouse_capture/events` event channel'ı `{type: motion, dx, dy}`, `{type: locked}` ve `{type: lost}` gönderir (Windows `reason` ekler). Eksik bir plugin (yeniden build edilmemiş bir uygulama, plugin'i olmayan bir platform) exception fırlatılmadan `unsupported` olarak bildirilir.
+Native backend (`linux/lumina_mouse_capture_plugin.cc`, `windows/lumina_mouse_capture_plugin.cpp`, `macos/lumina_mouse_capture/Sources/lumina_mouse_capture/LuminaMouseCapturePlugin.swift`). `lumina_mouse_capture` method channel'ı `support`'a `{kind, pointerLock, relativeMotion, detail}`, `capture`'a bir bool (isteğe bağlı `{x, y}`) ile ve `release`'e cevap verir; `lumina_mouse_capture/events` event channel'ı `{type: motion, dx, dy}`, `{type: locked}` ve `{type: lost}` gönderir (Windows ve macOS `reason` ekler). Eksik bir plugin (yeniden build edilmemiş bir uygulama, plugin'i olmayan bir platform) exception fırlatılmadan `unsupported` olarak bildirilir.
 
 ### `lib/src/recording_backend.dart`
 

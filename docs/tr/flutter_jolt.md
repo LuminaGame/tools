@@ -15,7 +15,7 @@
 
 ## Native build
 
-Jolt vendored değildir, indirilir. `tool/jolt_version.txt` sürümü sabitler (tag `v5.6.0` ve commit'i); `tool/build_jolt.bat` (Windows, Visual Studio 2022, Visual Studio'nun CMake ve Ninja'sı) ve `tool/build_jolt.sh` (Linux, lumina repo'sundaki paketli libc++ ile clang, `-fPIC`) onu gitignore'daki `third_party/jolt/src` klasörüne klonlar, başka bir commit'i reddeder, `Jolt` static kütüphanesini build eder ve kendi kendine yeten bir build klasörü yazar:
+Jolt vendored değildir, indirilir. `tool/jolt_version.txt` sürümü sabitler (tag `v5.6.0` ve commit'i); `tool/build_jolt.bat` (Windows, Visual Studio 2022, Visual Studio'nun CMake ve Ninja'sı) ve `tool/build_jolt.sh` (Linux: lumina repo'sundaki paketli libc++ ile clang, `-fPIC`; macOS: sistem libc++'ı ile clang, host mimarisi için) onu gitignore'daki `third_party/jolt/src` klasörüne klonlar, başka bir commit'i reddeder, `Jolt` static kütüphanesini build eder ve kendi kendine yeten bir build klasörü yazar:
 
 | Yol | İçerik |
 |---|---|
@@ -101,7 +101,7 @@ Web aynı C API'sini tek bir WebAssembly modülü olarak çalıştırır: `web/f
 
 - Temas impulsları o adım için tahmindir (dönme terimleri yok), çözülmüş impulslar değildir.
 - Height field'lar blok başına örnek başına yaklaşık 8 bit tutar (metre ölçekli arazide birkaç milimetre) ve yalnızca static'tir.
-- Windows x64 ve Linux x64'te (Ubuntu, clang 21) ve WebAssembly olarak (tek iş parçacıklı) build edildi ve test edildi; Android, macOS ve iOS henüz build edilmiyor.
+- Windows x64 ve Linux x64'te (Ubuntu, clang 21) ve WebAssembly olarak (tek iş parçacıklı) build edildi ve test edildi; `build_jolt.sh` macOS'ta da build eder (release workflow'unun kapalı macOS job'u bunu `jolt-macos-arm64.tar.gz` olarak paketler); Android ve iOS henüz build edilmiyor.
 
 ---
 
