@@ -1166,6 +1166,7 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
   s->friction = 0.5f;
   s->restitution = 0.0f;
   s->pressure = 0.0f;
+  s->volume_compliance = 0.0f;
   s->vertex_radius = 0.01f;
   s->gravity_factor = 1.0f;
   s->update_position = true;
@@ -1176,7 +1177,8 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
 static uint32_t createSoftBody(JoltWorld* world, const float* positions, const float* inverse_masses,
                                uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
                                const float* position3, const float* rotation4, const JoltClothSettings* s,
-                               const JoltClothSkin* skin, uint64_t user_data) {
+                               const JoltClothSkin* skin, uint64_t user_data, const uint32_t* tetrahedra = nullptr,
+                               uint32_t tetrahedron_count = 0) {
   if (vertex_count < 3 || index_count < 3) return BodyID::cInvalidBodyID;
   Ref<SoftBodySharedSettings> shared = new SoftBodySharedSettings();
   shared->mVertices.reserve(vertex_count);
@@ -1204,6 +1206,22 @@ static uint32_t createSoftBody(JoltWorld* world, const float* positions, const f
                                                  : s->bend_type == 1 ? SoftBodySharedSettings::EBendType::Distance
                                                                      : SoftBodySharedSettings::EBendType::None;
   shared->CreateConstraints(&attributes, 1, bend);
+  if (tetrahedra != nullptr && tetrahedron_count > 0) {
+    const float volumeCompliance = std::max(0.0f, s->volume_compliance);
+    for (uint32_t t = 0; t < tetrahedron_count; ++t) {
+      const uint32_t* q = tetrahedra + 4 * t;
+      if (q[0] >= vertex_count || q[1] >= vertex_count || q[2] >= vertex_count || q[3] >= vertex_count) continue;
+      if (q[0] == q[1] || q[0] == q[2] || q[0] == q[3] || q[1] == q[2] || q[1] == q[3] || q[2] == q[3]) continue;
+      const Vec3 a = Vec3(shared->mVertices[q[0]].mPosition);
+      const Vec3 e1 = Vec3(shared->mVertices[q[1]].mPosition) - a;
+      const Vec3 e2 = Vec3(shared->mVertices[q[2]].mPosition) - a;
+      const Vec3 e3 = Vec3(shared->mVertices[q[3]].mPosition) - a;
+      // No volume at rest: nothing to keep.
+      if (std::abs(e1.Cross(e2).Dot(e3)) < 1.0e-12f) continue;
+      shared->mVolumeConstraints.push_back(SoftBodySharedSettings::Volume(q[0], q[1], q[2], q[3], volumeCompliance));
+    }
+    shared->CalculateVolumeConstraintVolumes();
+  }
   if (skin != nullptr && skin->joint_count > 0) {
     for (uint32_t j = 0; j < skin->joint_count; ++j) {
       const float* m = skin->inverse_binds + 16 * j;
@@ -1249,6 +1267,15 @@ static uint32_t createSoftBody(JoltWorld* world, const float* positions, const f
   d = BodyData();
   d.used = true;
   return id.GetIndexAndSequenceNumber();
+}
+
+uint32_t jolt_soft_body_create_volume(JoltWorld* world, const float* positions, const float* inverse_masses,
+                                      uint32_t vertex_count, const uint32_t* indices, uint32_t index_count,
+                                      const uint32_t* tetrahedra, uint32_t tetrahedron_count, const float* position3,
+                                      const float* rotation4, const JoltClothSettings* s, const JoltClothSkin* skin,
+                                      uint64_t user_data) {
+  return createSoftBody(world, positions, inverse_masses, vertex_count, indices, index_count, position3, rotation4, s,
+                        skin, user_data, tetrahedra, tetrahedron_count);
 }
 
 uint32_t jolt_soft_body_create(JoltWorld* world, const float* positions, const float* inverse_masses,

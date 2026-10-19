@@ -34,6 +34,7 @@ class JoltClothSettings {
     this.friction = 0.5,
     this.restitution = 0.0,
     this.pressure = 0.0,
+    this.volumeCompliance = 0.0,
     this.vertexRadius = 0.01,
     this.gravityFactor = 1.0,
     this.allowSleeping = true,
@@ -54,6 +55,11 @@ class JoltClothSettings {
 
   /// Gas pressure for closed meshes (0 for cloth).
   double pressure;
+
+  /// Compliance of the tetrahedral volume constraints
+  /// ([JoltWorldCloth.createCloth]'s `tetrahedra`): 0 keeps every
+  /// tetrahedron's rest volume rigidly, larger lets it squash.
+  double volumeCompliance;
 
   /// How far vertices keep from other bodies' surfaces (m).
   double vertexRadius;
@@ -94,6 +100,11 @@ extension JoltWorldCloth on JoltWorld {
   /// A cloth from [vertices] (body frame, m) and [triangles] (index triples),
   /// placed at [position] / [rotation]; [inverseMasses] per vertex (0 pins a
   /// vertex where it is; null: all 1). Returns the body id.
+  ///
+  /// [tetrahedra] (index quadruples) make it a volumetric soft body: each
+  /// tetrahedron keeps its rest volume ([JoltClothSettings.volumeCompliance]),
+  /// so soft tissue squashes and comes back instead of slumping. The
+  /// triangles stay the surface; the tetrahedra may use inner vertices.
   int createCloth(
     List<Vector3> vertices,
     List<int> triangles, {
@@ -102,9 +113,11 @@ extension JoltWorldCloth on JoltWorld {
     Quaternion? rotation,
     JoltClothSettings? settings,
     JoltClothSkin? skin,
+    List<int>? tetrahedra,
     int userData = 0,
   }) {
     JoltPhysics.ensureAvailable();
+    if (tetrahedra != null) _checkTetrahedra(tetrahedra, vertices.length);
     if (skin != null &&
         (skin.joints.length < vertices.length * 4 ||
             skin.weights.length < vertices.length * 4 ||
@@ -123,7 +136,12 @@ extension JoltWorldCloth on JoltWorld {
     final idx = calloc<Uint32>(triangles.isEmpty ? 1 : triangles.length);
     final pose = calloc<Float>(7);
     final cs = calloc<b.JoltClothSettings>();
+    final tetCount = (tetrahedra?.length ?? 0) ~/ 4;
+    final tets = calloc<Uint32>(tetCount == 0 ? 1 : tetCount * 4);
     try {
+      for (var i = 0; i < tetCount * 4; i++) {
+        tets[i] = tetrahedra![i];
+      }
       for (var i = 0; i < n; i++) {
         pos[3 * i] = vertices[i].x;
         pos[3 * i + 1] = vertices[i].y;
@@ -156,12 +174,29 @@ extension JoltWorldCloth on JoltWorld {
         ..friction = s.friction
         ..restitution = s.restitution
         ..pressure = s.pressure
+        ..volume_compliance = s.volumeCompliance
         ..vertex_radius = s.vertexRadius
         ..gravity_factor = s.gravityFactor
         ..update_position = true
         ..allow_sleeping = s.allowSleeping
         ..double_sided = s.doubleSided;
-      final id = skin == null
+      final id = skin == null && tetCount > 0
+          ? b.jolt_soft_body_create_volume(
+              handle,
+              pos,
+              inv,
+              n,
+              idx,
+              triangles.length,
+              tets,
+              tetCount,
+              pose,
+              pose + 3,
+              cs,
+              nullptr,
+              userData,
+            )
+          : skin == null
           ? b.jolt_soft_body_create(
               handle,
               pos,
@@ -184,6 +219,8 @@ extension JoltWorldCloth on JoltWorld {
               cs,
               skin,
               userData,
+              tets,
+              tetCount,
             );
       if (id == JoltPhysics.invalidBodyId) {
         throw ArgumentError('Jolt could not build the cloth');
@@ -195,7 +232,23 @@ extension JoltWorldCloth on JoltWorld {
         ..free(inv)
         ..free(idx)
         ..free(pose)
-        ..free(cs);
+        ..free(cs)
+        ..free(tets);
+    }
+  }
+
+  static void _checkTetrahedra(List<int> tetrahedra, int vertexCount) {
+    if (tetrahedra.length % 4 != 0) {
+      throw ArgumentError('tetrahedra needs four vertex indices per tetrahedron');
+    }
+    for (var i = 0; i < tetrahedra.length; i += 4) {
+      final q = tetrahedra.sublist(i, i + 4);
+      if (q.any((v) => v < 0 || v >= vertexCount)) {
+        throw ArgumentError('tetrahedron ${i ~/ 4} names a vertex past the $vertexCount vertices: $q');
+      }
+      if (q.toSet().length != 4) {
+        throw ArgumentError('tetrahedron ${i ~/ 4} repeats a vertex: $q');
+      }
     }
   }
 
@@ -369,6 +422,8 @@ extension JoltWorldCloth on JoltWorld {
     Pointer<b.JoltClothSettings> cs,
     JoltClothSkin skin,
     int userData,
+    Pointer<Uint32> tets,
+    int tetCount,
   ) {
     final jointCount = skin.inverseBinds.length;
     final binds = calloc<Float>(math.max(1, jointCount) * 16);
@@ -407,19 +462,35 @@ extension JoltWorldCloth on JoltWorld {
         ..max_distances = maxD
         ..backstop_distances = back
         ..backstop_radius = skin.backstopRadius;
-      return b.jolt_skinned_cloth_create(
-        handle,
-        pos,
-        inv,
-        n,
-        idx,
-        indexCount,
-        pose,
-        pose + 3,
-        cs,
-        sk,
-        userData,
-      );
+      return tetCount > 0
+          ? b.jolt_soft_body_create_volume(
+              handle,
+              pos,
+              inv,
+              n,
+              idx,
+              indexCount,
+              tets,
+              tetCount,
+              pose,
+              pose + 3,
+              cs,
+              sk,
+              userData,
+            )
+          : b.jolt_skinned_cloth_create(
+              handle,
+              pos,
+              inv,
+              n,
+              idx,
+              indexCount,
+              pose,
+              pose + 3,
+              cs,
+              sk,
+              userData,
+            );
     } finally {
       calloc
         ..free(binds)

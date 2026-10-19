@@ -372,6 +372,16 @@ void jolt_soft_body_set_inverse_mass(ffi.Pointer<JoltWorld> world, int body, int
 int jolt_skinned_cloth_create(ffi.Pointer<JoltWorld> world, ffi.Pointer<ffi.Float> positions, ffi.Pointer<ffi.Float> inverse_masses, int vertex_count, ffi.Pointer<ffi.Uint32> indices, int index_count, ffi.Pointer<ffi.Float> position3, ffi.Pointer<ffi.Float> rotation4, ffi.Pointer<JoltClothSettings> settings, ffi.Pointer<JoltClothSkin> skin, int user_data) =>
     _m.jolt_skinned_cloth_create(world.address.toJS, positions.address.toJS, inverse_masses.address.toJS, vertex_count.toJS, indices.address.toJS, index_count.toJS, position3.address.toJS, rotation4.address.toJS, settings.address.toJS, skin.address.toJS, FlutterJoltModule.toBigInt(user_data)).toDartInt.toUnsigned(32);
 
+/// A soft body (as jolt_soft_body_create, or jolt_skinned_cloth_create when
+/// skin is not null) whose volume is also held by tetrahedral volume
+/// constraints: tetrahedron_count tetrahedra of four vertex indices each in
+/// tetrahedra, kept at their rest volume with settings->volume_compliance.
+/// The triangles are the surface (collision and rendering); the tetrahedra may
+/// use inner vertices. A tetrahedron with an index past vertex_count, a
+/// repeated vertex or no volume at rest is skipped.
+int jolt_soft_body_create_volume(ffi.Pointer<JoltWorld> world, ffi.Pointer<ffi.Float> positions, ffi.Pointer<ffi.Float> inverse_masses, int vertex_count, ffi.Pointer<ffi.Uint32> indices, int index_count, ffi.Pointer<ffi.Uint32> tetrahedra, int tetrahedron_count, ffi.Pointer<ffi.Float> position3, ffi.Pointer<ffi.Float> rotation4, ffi.Pointer<JoltClothSettings> settings, ffi.Pointer<JoltClothSkin> skin, int user_data) =>
+    _m.jolt_soft_body_create_volume(world.address.toJS, positions.address.toJS, inverse_masses.address.toJS, vertex_count.toJS, indices.address.toJS, index_count.toJS, tetrahedra.address.toJS, tetrahedron_count.toJS, position3.address.toJS, rotation4.address.toJS, settings.address.toJS, skin.address.toJS, FlutterJoltModule.toBigInt(user_data)).toDartInt.toUnsigned(32);
+
 /// Poses a skinned cloth's skeleton: count column-major 4x4 joint matrices in
 /// the world (metres). hard_skin_all puts every vertex on its skinned
 /// position (a reset or a teleport).
@@ -646,20 +656,25 @@ final class JoltClothSettings extends ffi.Struct {
   double get pressure => FlutterJoltModule.heap.getFloat32($address + 44, Endian.little);
   set pressure(double value) => FlutterJoltModule.heap.setFloat32($address + 44, value, Endian.little);
 
-  double get vertex_radius => FlutterJoltModule.heap.getFloat32($address + 48, Endian.little);
-  set vertex_radius(double value) => FlutterJoltModule.heap.setFloat32($address + 48, value, Endian.little);
+  /// Compliance of the tetrahedral volume constraints (0 keeps each
+  /// tetrahedron's volume rigidly); used by jolt_soft_body_create_volume.
+  double get volume_compliance => FlutterJoltModule.heap.getFloat32($address + 48, Endian.little);
+  set volume_compliance(double value) => FlutterJoltModule.heap.setFloat32($address + 48, value, Endian.little);
 
-  double get gravity_factor => FlutterJoltModule.heap.getFloat32($address + 52, Endian.little);
-  set gravity_factor(double value) => FlutterJoltModule.heap.setFloat32($address + 52, value, Endian.little);
+  double get vertex_radius => FlutterJoltModule.heap.getFloat32($address + 52, Endian.little);
+  set vertex_radius(double value) => FlutterJoltModule.heap.setFloat32($address + 52, value, Endian.little);
 
-  bool get update_position => FlutterJoltModule.heap.getUint8($address + 56) != 0;
-  set update_position(bool value) => FlutterJoltModule.heap.setUint8($address + 56, value ? 1 : 0);
+  double get gravity_factor => FlutterJoltModule.heap.getFloat32($address + 56, Endian.little);
+  set gravity_factor(double value) => FlutterJoltModule.heap.setFloat32($address + 56, value, Endian.little);
 
-  bool get allow_sleeping => FlutterJoltModule.heap.getUint8($address + 57) != 0;
-  set allow_sleeping(bool value) => FlutterJoltModule.heap.setUint8($address + 57, value ? 1 : 0);
+  bool get update_position => FlutterJoltModule.heap.getUint8($address + 60) != 0;
+  set update_position(bool value) => FlutterJoltModule.heap.setUint8($address + 60, value ? 1 : 0);
 
-  bool get double_sided => FlutterJoltModule.heap.getUint8($address + 58) != 0;
-  set double_sided(bool value) => FlutterJoltModule.heap.setUint8($address + 58, value ? 1 : 0);
+  bool get allow_sleeping => FlutterJoltModule.heap.getUint8($address + 61) != 0;
+  set allow_sleeping(bool value) => FlutterJoltModule.heap.setUint8($address + 61, value ? 1 : 0);
+
+  bool get double_sided => FlutterJoltModule.heap.getUint8($address + 62) != 0;
+  set double_sided(bool value) => FlutterJoltModule.heap.setUint8($address + 62, value ? 1 : 0);
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are
@@ -913,6 +928,8 @@ extension type _Module._(JSObject _) implements JSObject {
   external void jolt_soft_body_set_inverse_mass(JSNumber world, JSNumber body, JSNumber index, JSNumber inverse_mass);
   @JS('_jolt_skinned_cloth_create')
   external JSNumber jolt_skinned_cloth_create(JSNumber world, JSNumber positions, JSNumber inverse_masses, JSNumber vertex_count, JSNumber indices, JSNumber index_count, JSNumber position3, JSNumber rotation4, JSNumber settings, JSNumber skin, JSBigInt user_data);
+  @JS('_jolt_soft_body_create_volume')
+  external JSNumber jolt_soft_body_create_volume(JSNumber world, JSNumber positions, JSNumber inverse_masses, JSNumber vertex_count, JSNumber indices, JSNumber index_count, JSNumber tetrahedra, JSNumber tetrahedron_count, JSNumber position3, JSNumber rotation4, JSNumber settings, JSNumber skin, JSBigInt user_data);
   @JS('_jolt_soft_body_skin')
   external void jolt_soft_body_skin(JSNumber world, JSNumber body, JSNumber joint_world16, JSNumber count, JSNumber hard_skin_all);
   @JS('_jolt_body_set_cloth_collider')
@@ -950,7 +967,7 @@ void $registerJoltBindings() {
   ffi.$registerStruct<JoltBodySettings>(136, 8, JoltBodySettings.$at);
   ffi.$registerStruct<JoltContact>(56, 4, JoltContact.$at);
   ffi.$registerStruct<JoltRayHit>(36, 4, JoltRayHit.$at);
-  ffi.$registerStruct<JoltClothSettings>(60, 4, JoltClothSettings.$at);
+  ffi.$registerStruct<JoltClothSettings>(64, 4, JoltClothSettings.$at);
   ffi.$registerStruct<JoltClothSkin>(28, 4, JoltClothSkin.$at);
   ffi.$registerStruct<JoltSwingTwistSettings>(92, 4, JoltSwingTwistSettings.$at);
   ffi.$registerStruct<JoltHingeSettings>(84, 4, JoltHingeSettings.$at);

@@ -475,4 +475,88 @@ void main() {
       expect(with_, greaterThan(0.01));
     },
   );
+
+  group('tetrahedral volume constraints', () {
+    /// A 0.4 m cube of soft tissue: its eight corners and its centre, the
+    /// twelve outward surface triangles, and twelve tetrahedra (the centre
+    /// and each surface triangle).
+    (List<Vector3>, List<int>, List<int>) cube() {
+      const h = 0.2;
+      final v = <Vector3>[
+        for (final z in [-h, h])
+          for (final y in [-h, h])
+            for (final x in [-h, h]) Vector3(x, y, z),
+        Vector3.zero(),
+      ];
+      // Corner index: x + 2y + 4z.
+      const quads = [
+        [0, 2, 3, 1], [4, 5, 7, 6], // -z, +z
+        [0, 1, 5, 4], [2, 6, 7, 3], // -y, +y
+        [0, 4, 6, 2], [1, 3, 7, 5], // -x, +x
+      ];
+      final t = <int>[for (final q in quads) ...[q[0], q[1], q[2], q[0], q[2], q[3]]];
+      final tets = <int>[for (var i = 0; i < t.length; i += 3) ...[8, t[i], t[i + 1], t[i + 2]]];
+      return (v, t, tets);
+    }
+
+    double volume(Float32List p, List<int> tets) {
+      Vector3 at(int i) => Vector3(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+      var sum = 0.0;
+      for (var i = 0; i < tets.length; i += 4) {
+        final a = at(tets[i]);
+        sum += (at(tets[i + 1]) - a).cross(at(tets[i + 2]) - a).dot(at(tets[i + 3]) - a) / 6;
+      }
+      return sum.abs();
+    }
+
+    /// The cube's volume after it fell on the ground and settled, as a
+    /// fraction of its rest volume.
+    double settle({required bool withTetrahedra}) {
+      final world = JoltWorld(workerThreads: 2);
+      addTearDown(world.dispose);
+      final ground = JoltShape.box(Vector3(5, 0.5, 5));
+      world.createBody(ground, JoltBodySettings(motionType: JoltMotionType.static_, position: Vector3(0, -0.5, 0)));
+      ground.release();
+      final (v, t, tets) = cube();
+      // Very soft edges and no bend or shear: on its own the mesh slumps.
+      final body = world.createCloth(
+        v,
+        t,
+        position: Vector3(0, 0.5, 0),
+        settings: JoltClothSettings(
+          edgeCompliance: 5e-2,
+          shearCompliance: null,
+          bendCompliance: null,
+          bend: JoltClothBend.none,
+          tethers: JoltClothTethers.none,
+          doubleSided: false,
+          allowSleeping: false,
+        ),
+        tetrahedra: withTetrahedra ? tets : null,
+      );
+      final rest = volume(world.clothVertices(body), tets);
+      for (var i = 0; i < 240; i++) {
+        world.step(1 / 120);
+      }
+      final p = world.clothVertices(body);
+      expect(p.every((x) => x.isFinite), isTrue);
+      return volume(p, tets) / rest;
+    }
+
+    test('keep a soft body\'s volume when it lands; without them the same mesh slumps', () {
+      final kept = settle(withTetrahedra: true);
+      final slumped = settle(withTetrahedra: false);
+      expect(kept, greaterThan(0.9), reason: 'volume constraints at compliance 0');
+      expect(slumped, lessThan(kept - 0.2), reason: 'the edges alone do not hold the volume');
+    });
+
+    test('a tetrahedron with an index past the vertices or a repeated vertex is refused', () {
+      final world = JoltWorld(workerThreads: 1);
+      addTearDown(world.dispose);
+      final (v, t, _) = cube();
+      expect(() => world.createCloth(v, t, tetrahedra: [0, 1, 2, 99]), throwsArgumentError);
+      expect(() => world.createCloth(v, t, tetrahedra: [0, 1, 1, 2]), throwsArgumentError);
+      expect(() => world.createCloth(v, t, tetrahedra: [0, 1, 2]), throwsArgumentError);
+    });
+  });
 }

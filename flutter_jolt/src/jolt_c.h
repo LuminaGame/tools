@@ -301,6 +301,9 @@ typedef struct JoltClothSettings {
   float friction;
   float restitution;
   float pressure;
+  /// Compliance of the tetrahedral volume constraints (0 keeps each
+  /// tetrahedron's volume rigidly); used by jolt_soft_body_create_volume.
+  float volume_compliance;
   float vertex_radius;
   float gravity_factor;
   bool update_position;
@@ -382,6 +385,20 @@ JOLT_C_EXPORT uint32_t jolt_skinned_cloth_create(JoltWorld* world, const float* 
                                                  const float* position3, const float* rotation4,
                                                  const JoltClothSettings* settings, const JoltClothSkin* skin,
                                                  uint64_t user_data);
+/// A soft body (as jolt_soft_body_create, or jolt_skinned_cloth_create when
+/// skin is not null) whose volume is also held by tetrahedral volume
+/// constraints: tetrahedron_count tetrahedra of four vertex indices each in
+/// tetrahedra, kept at their rest volume with settings->volume_compliance.
+/// The triangles are the surface (collision and rendering); the tetrahedra may
+/// use inner vertices. A tetrahedron with an index past vertex_count, a
+/// repeated vertex or no volume at rest is skipped.
+JOLT_C_EXPORT uint32_t jolt_soft_body_create_volume(JoltWorld* world, const float* positions,
+                                                    const float* inverse_masses, uint32_t vertex_count,
+                                                    const uint32_t* indices, uint32_t index_count,
+                                                    const uint32_t* tetrahedra, uint32_t tetrahedron_count,
+                                                    const float* position3, const float* rotation4,
+                                                    const JoltClothSettings* settings, const JoltClothSkin* skin,
+                                                    uint64_t user_data);
 /// Poses a skinned cloth's skeleton: count column-major 4x4 joint matrices in
 /// the world (metres). hard_skin_all puts every vertex on its skinned
 /// position (a reset or a teleport).

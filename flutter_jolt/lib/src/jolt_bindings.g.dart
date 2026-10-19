@@ -901,6 +901,46 @@ external int jolt_skinned_cloth_create(
   int user_data,
 );
 
+/// A soft body (as jolt_soft_body_create, or jolt_skinned_cloth_create when
+/// skin is not null) whose volume is also held by tetrahedral volume
+/// constraints: tetrahedron_count tetrahedra of four vertex indices each in
+/// tetrahedra, kept at their rest volume with settings->volume_compliance.
+/// The triangles are the surface (collision and rendering); the tetrahedra may
+/// use inner vertices. A tetrahedron with an index past vertex_count, a
+/// repeated vertex or no volume at rest is skipped.
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<JoltWorld>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<ffi.Float>,
+    ffi.Pointer<JoltClothSettings>,
+    ffi.Pointer<JoltClothSkin>,
+    ffi.Uint64,
+  )
+>(isLeaf: true)
+external int jolt_soft_body_create_volume(
+  ffi.Pointer<JoltWorld> world,
+  ffi.Pointer<ffi.Float> positions,
+  ffi.Pointer<ffi.Float> inverse_masses,
+  int vertex_count,
+  ffi.Pointer<ffi.Uint32> indices,
+  int index_count,
+  ffi.Pointer<ffi.Uint32> tetrahedra,
+  int tetrahedron_count,
+  ffi.Pointer<ffi.Float> position3,
+  ffi.Pointer<ffi.Float> rotation4,
+  ffi.Pointer<JoltClothSettings> settings,
+  ffi.Pointer<JoltClothSkin> skin,
+  int user_data,
+);
+
 /// Poses a skinned cloth's skeleton: count column-major 4x4 joint matrices in
 /// the world (metres). hard_skin_all puts every vertex on its skinned
 /// position (a reset or a teleport).
@@ -1274,6 +1314,11 @@ final class JoltClothSettings extends ffi.Struct {
 
   @ffi.Float()
   external double pressure;
+
+  /// Compliance of the tetrahedral volume constraints (0 keeps each
+  /// tetrahedron's volume rigidly); used by jolt_soft_body_create_volume.
+  @ffi.Float()
+  external double volume_compliance;
 
   @ffi.Float()
   external double vertex_radius;
