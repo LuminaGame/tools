@@ -225,14 +225,20 @@ class SmokeMcpCommands {
     return SmokeMcpResult.text('${_describe(a)} did not appear in ${timeout.inMilliseconds} ms', isError: true);
   }
 
-  /// The whole view's boundary: the largest [RepaintBoundary] on screen.
+  /// The whole view's boundary: the [RepaintBoundary] showing the most of the
+  /// screen (its area inside the view: a long scrolled list's boundary is
+  /// larger than the window but mostly off it).
   Finder _screen() {
+    final view = tester.view;
+    final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
     Element? best;
     var area = -1.0;
     for (final e in find.byType(RepaintBoundary).evaluate()) {
       final box = e.renderObject;
-      if (box is! RenderBox || !box.hasSize) continue;
-      final a = box.size.width * box.size.height;
+      if (box is! RenderBox || !box.hasSize || !box.attached) continue;
+      final shown = (box.localToGlobal(Offset.zero) & box.size).intersect(screen);
+      if (shown.width <= 0 || shown.height <= 0) continue;
+      final a = shown.width * shown.height;
       if (a > area) {
         area = a;
         best = e;

@@ -39,7 +39,13 @@ class _AppState extends State<_App> {
           ),
           Text('Keys $keys'),
           Expanded(
-            child: ListView(children: [for (var i = 0; i < 100; i++) SizedBox(height: 30, child: Text('Item $i'))]),
+            child: ListView(
+              children: [
+                for (var i = 0; i < 100; i++) SizedBox(height: 30, child: Text('Item $i')),
+                // A boundary larger than the window, mostly off it.
+                const RepaintBoundary(child: SizedBox(height: 3000, child: Text('Long'))),
+              ],
+            ),
           ),
         ],
       ),
@@ -82,6 +88,11 @@ void main() {
     final shot = await c.run('screenshot', {});
     expect(shot.isError, isFalse, reason: _text(shot));
     expect(SmokeMcpCommands.decodeImage(shot).sublist(1, 4), 'PNG'.codeUnits);
+    // What the window shows (here the list, no boundary covers the whole
+    // window), not the long boundary scrolled into view and mostly off it.
+    await c.run('scroll_until_visible', {'text': 'Long', 'x': 200, 'y': 400});
+    final size = RegExp(r'\((\d+)×(\d+)\)').firstMatch(_text(await c.run('screenshot', {'save_only': true})))!;
+    expect(int.parse(size.group(2)!), lessThanOrEqualTo(600));
 
     final missing = await c.run('tap', {'text': 'Nowhere'});
     expect(missing.isError, isTrue);
