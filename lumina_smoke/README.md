@@ -10,6 +10,7 @@ It is engine-independent: nothing here depends on `flutter_filament`, `lumina` o
 |---|---|---|
 | `package:lumina_smoke/lumina_smoke.dart` | `SmokeArtifacts`, `SmokeVideo` / `SmokeVideoInfo`, `SmokeVideoRecorder`, `SmokeWebm`, `SmokePng`, `SmokeTools`, `SmokeTempDirs` | `dart:io` |
 | `package:lumina_smoke/flutter.dart` | the above plus `SmokeRecorder` (records a running app) and `SmokeCapture` (widget / integration-test PNGs) | `flutter_test` |
+| `package:lumina_smoke/smoke_mcp.dart` | `serveSmokeMcp`, `SmokeMcpCommands`: an app served to the smoke MCP from an integration test (stdio bridge `bin/smoke_mcp_bridge.dart`) | `flutter_test` |
 | `package:lumina_smoke/report.dart` | `runSmokeReport` / `smokeReportMain`, `SmokeReportConfig`, `TestCategories`, `SmokeReportGenerator`, the live `SmokeDashboardServer` | `dart:io` (runs under `dart run`) |
 
 ```yaml

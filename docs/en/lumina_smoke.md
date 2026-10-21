@@ -65,6 +65,57 @@ final png = await SmokeCapture.captureWidgetPng(tester, find.byKey(boundaryKey))
 
 Frames are captured at 30 fps at no less than 1024×768 and streamed to a temporary file; recordings a killed run left behind are purged.
 
+## Driving an app through MCP (the smoke MCP)
+
+An agent (Claude Code) can drive a running app the way a smoke test does, with every input synthesized inside
+Flutter, so the user's mouse and keyboard are never touched and the app runs in its own window beside the user's
+work. The app side is an integration test that pumps the app and serves it:
+
+```dart
+import 'package:integration_test/integration_test.dart';
+import 'package:lumina_smoke/smoke_mcp.dart';
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('served to the smoke MCP', (tester) async {
+    await tester.pumpWidget(const MyApp());
+    await serveSmokeMcp(tester, binding: binding); // returns at once without a bridge
+  }, timeout: Timeout.none);
+}
+```
+
+`serveSmokeMcp` binds 127.0.0.1 on a free port with a random bearer token, writes `{url, token, pid}` to the
+connection file named by `--dart-define=LUMINA_SMOKE_MCP=<path>` (or that environment variable), switches the binding
+to fully live frames and runs each posted command (`POST /command`, `{"tool", "arguments"}`) in order through
+`SmokeMcpCommands`, until `stop` or 30 idle minutes; then it deletes the file.
+
+The agent side is the stdio bridge `bin/smoke_mcp_bridge.dart` (only `dart:` imports). Register it once, for example
+in a project's `.mcp.json`:
+
+```json
+{"mcpServers": {"lumina-smoke": {"type": "stdio", "command": "dart",
+  "args": ["<tools>/lumina_smoke/bin/smoke_mcp_bridge.dart"]}}}
+```
+
+or `claude mcp add lumina-smoke -- dart <tools>/lumina_smoke/bin/smoke_mcp_bridge.dart`. Its tools:
+
+| Tool | What it does |
+|---|---|
+| `smoke_launch` | `flutter test <target> -d <device>` in `package_dir` (extra `env`, `flutter` executable), waits until the app serves; the log is in the temp dir's `lumina_smoke_mcp/` |
+| `smoke_status`, `smoke_stop` | what runs; ends the test (the whole process tree if it does not end in 60 s) |
+| `info` | the view's logical size and pixel ratio, recording state |
+| `screenshot` | PNG of the whole view (the largest `RepaintBoundary`, the Filament texture included) or the widget with `key`; also written to a file |
+| `widgets` | texts, text fields and string-keyed widgets on screen with their rectangles, top to bottom (`contains` filters) |
+| `tap`, `tap_at` | a widget (`text` (`exact: false` for a part), `key`, `tooltip` or `semantics_label`, `index`) or a point |
+| `drag`, `drag_from` | a widget or a point by `dx`, `dy` over `duration_ms` (a slider's thumb, a viewport orbit) |
+| `scroll`, `scroll_until_visible` | mouse-wheel scrolls at a point; until a widget is built, then into view |
+| `enter_text`, `press_key` | a text field's text; a logical key by name (`pageDown`, `tab`, `a`) |
+| `wait`, `wait_for` | let the app run; until a widget appears |
+| `record_start`, `record_stop` | a smoke video of the view: drags play out frame by frame, other actions are followed by 0.4 s; saved as the named test's artifact under the smoke-video rules |
+
+Coordinates are logical pixels from the view's top left, as `widgets` reports them. Events go through the tester
+(`sendEventToBinding`): a live binding drops events it takes for the device's while a test runs.
+
 ## The report runner
 
 A package keeps a tiny `tool/smoke_report.dart` with its configuration:

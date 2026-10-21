@@ -65,6 +65,57 @@ final png = await SmokeCapture.captureWidgetPng(tester, find.byKey(boundaryKey))
 
 Frame'ler 30 fps'te, en az 1024×768'de yakalanır ve geçici bir dosyaya stream edilir; öldürülmüş bir run'ın bıraktığı kayıtlar temizlenir.
 
+## Bir app'i MCP ile sürmek (smoke MCP)
+
+Bir ajan (Claude Code), çalışan bir app'i bir smoke testi gibi sürebilir: her girdi Flutter'ın içinde sentezlenir,
+kullanıcının faresi ve klavyesine hiç dokunulmaz ve app kullanıcının işinin yanında kendi penceresinde çalışır. App
+tarafı, app'i pump edip sunan bir integration testtir:
+
+```dart
+import 'package:integration_test/integration_test.dart';
+import 'package:lumina_smoke/smoke_mcp.dart';
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('served to the smoke MCP', (tester) async {
+    await tester.pumpWidget(const MyApp());
+    await serveSmokeMcp(tester, binding: binding); // köprü yoksa hemen döner
+  }, timeout: Timeout.none);
+}
+```
+
+`serveSmokeMcp` 127.0.0.1'de boş bir portu rastgele bir bearer token ile dinler, `{url, token, pid}` bilgisini
+`--dart-define=LUMINA_SMOKE_MCP=<yol>` (ya da aynı adlı ortam değişkeni) ile verilen bağlantı dosyasına yazar,
+binding'i tamamen canlı frame'lere geçirir ve gönderilen her komutu (`POST /command`, `{"tool", "arguments"}`) sırayla
+`SmokeMcpCommands` ile çalıştırır; `stop` gelene ya da 30 dakika boş kalana kadar. Sonra dosyayı siler.
+
+Ajan tarafı stdio köprüsü `bin/smoke_mcp_bridge.dart`'tır (yalnızca `dart:` import'ları). Bir kez kaydedilir, örneğin
+bir projenin `.mcp.json` dosyasında:
+
+```json
+{"mcpServers": {"lumina-smoke": {"type": "stdio", "command": "dart",
+  "args": ["<tools>/lumina_smoke/bin/smoke_mcp_bridge.dart"]}}}
+```
+
+ya da `claude mcp add lumina-smoke -- dart <tools>/lumina_smoke/bin/smoke_mcp_bridge.dart`. Araçları:
+
+| Araç | Ne yapar |
+|---|---|
+| `smoke_launch` | `package_dir` içinde `flutter test <target> -d <device>` (ek `env`, `flutter` yürütülebilir dosyası), app sunmaya başlayana kadar bekler; günlük geçici dizinin `lumina_smoke_mcp/` klasöründedir |
+| `smoke_status`, `smoke_stop` | ne çalışıyor; testi bitirir (60 s'de bitmezse bütün süreç ağacını) |
+| `info` | görünümün mantıksal boyutu ve piksel oranı, kayıt durumu |
+| `screenshot` | görünümün tamamının (en büyük `RepaintBoundary`, Filament dokusu dahil) ya da `key` widget'ının PNG'si; ayrıca dosyaya yazılır |
+| `widgets` | ekrandaki metinler, metin alanları ve string key'li widget'lar dikdörtgenleriyle, yukarıdan aşağı (`contains` süzer) |
+| `tap`, `tap_at` | bir widget (`text` (bir parçası için `exact: false`), `key`, `tooltip` ya da `semantics_label`, `index`) ya da bir nokta |
+| `drag`, `drag_from` | bir widget ya da noktayı `duration_ms` boyunca `dx`, `dy` kadar (bir slider'ın tutamacı, viewport'u döndürmek) |
+| `scroll`, `scroll_until_visible` | bir noktada fare tekerleği; bir widget kurulana kadar, sonra görünüme |
+| `enter_text`, `press_key` | bir metin alanının metni; adıyla mantıksal bir tuş (`pageDown`, `tab`, `a`) |
+| `wait`, `wait_for` | app'in çalışmasına izin verir; bir widget görünene kadar |
+| `record_start`, `record_stop` | görünümün smoke videosu: sürüklemeler kare kare, diğer eylemlerden sonra 0,4 s; adı verilen testin artifact'i olarak smoke video kurallarıyla kaydedilir |
+
+Koordinatlar, `widgets`'in bildirdiği gibi görünümün sol üstünden mantıksal pikseldir. Olaylar tester üzerinden gider
+(`sendEventToBinding`): canlı bir binding, test çalışırken cihazınki saydığı olayları atar.
+
 ## Report runner
 
 Her paket, konfigürasyonunu içeren küçük bir `tool/smoke_report.dart` tutar:

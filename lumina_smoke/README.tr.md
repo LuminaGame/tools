@@ -10,6 +10,7 @@ Engine'den bağımsızdır: buradaki hiçbir şey `flutter_filament`, `lumina` y
 |---|---|---|
 | `package:lumina_smoke/lumina_smoke.dart` | `SmokeArtifacts`, `SmokeVideo` / `SmokeVideoInfo`, `SmokeVideoRecorder`, `SmokeWebm`, `SmokePng`, `SmokeTools`, `SmokeTempDirs` | `dart:io` |
 | `package:lumina_smoke/flutter.dart` | yukarıdakiler, artı `SmokeRecorder` (çalışan bir app'i kaydeder) ve `SmokeCapture` (widget / integration test PNG'leri) | `flutter_test` |
+| `package:lumina_smoke/smoke_mcp.dart` | `serveSmokeMcp`, `SmokeMcpCommands`: bir integration testten smoke MCP'ye sunulan app (stdio köprüsü `bin/smoke_mcp_bridge.dart`) | `flutter_test` |
 | `package:lumina_smoke/report.dart` | `runSmokeReport` / `smokeReportMain`, `SmokeReportConfig`, `TestCategories`, `SmokeReportGenerator`, canlı `SmokeDashboardServer` | `dart:io` (`dart run` ile çalışır) |
 
 ```yaml
