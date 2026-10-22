@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -184,37 +185,72 @@ class SmokeRecorder {
   /// [SmokeArtifacts.minimumVideoWidth] × [SmokeArtifacts.minimumVideoHeight].
   File save(String testName, {List<String>? usedAssets}) {
     _close();
-    final seconds = recorded.inMicroseconds / 1e6;
     try {
-      if (_frames > 0 && SmokeVideo.isTooSmall(_width!, _height!)) {
-        throw StateError('Smoke video "$testName" is $_width×$_height; smoke videos must be at least '
-            '${SmokeArtifacts.minimumVideoWidth}×${SmokeArtifacts.minimumVideoHeight}.');
-      }
-      if (SmokeVideo.isTooShort(seconds)) {
-        throw StateError(
-          'Smoke video "$testName" is ${seconds.toStringAsFixed(2)} s; smoke videos must be at least '
-          '${SmokeArtifacts.minimumVideoSeconds.toStringAsFixed(0)} s of the scenario running. Extend the scenario '
-          "with more real steps; hold() only to show a step's result.",
-        );
-      }
-      final bytes = SmokeArtifacts.encodeWebmFromRawFile(
-        File('${_dir.path}/frames.rgba'),
-        width: _width!,
-        height: _height!,
-        frameDurationMs: frameInterval.inMilliseconds,
-        framesPerSecond: (1e6 / frameInterval.inMicroseconds).round(),
-      );
-      final video = SmokeArtifacts.saveVideoToDir(testName, bytes, SmokeArtifacts.dir, usedAssets: usedAssets);
-      // Next to the length in the sidecar, so a still stretch is visible
-      // without decoding the video.
-      SmokeArtifacts.annotate(testName, {'longestStillSeconds': longestStill.inMicroseconds / 1e6},
-          targetDir: video.parent);
-      // ignore: avoid_print
-      print('[SmokeRecorder] "$testName": ${seconds.toStringAsFixed(2)} s, longest still '
-          '${(longestStill.inMicroseconds / 1e6).toStringAsFixed(2)} s');
-      return video;
+      _check(testName);
+      return _write(testName, _encoder()(), usedAssets);
     } finally {
       _discard();
     }
+  }
+
+  /// [save] with the encoding on a background isolate, so a live app's window
+  /// keeps drawing meanwhile (a long recording encoded on the UI isolate
+  /// stops it answering, and the system closes it as hung). Under a test,
+  /// call it inside [WidgetTester.runAsync].
+  Future<File> saveInBackground(String testName, {List<String>? usedAssets}) async {
+    _close();
+    try {
+      _check(testName);
+      final bytes = await Isolate.run(_encoder());
+      return _write(testName, bytes, usedAssets);
+    } finally {
+      _discard();
+    }
+  }
+
+  void _check(String testName) {
+    final seconds = recorded.inMicroseconds / 1e6;
+    if (_frames > 0 && SmokeVideo.isTooSmall(_width!, _height!)) {
+      throw StateError(
+        'Smoke video "$testName" is $_width×$_height; smoke videos must be at least '
+        '${SmokeArtifacts.minimumVideoWidth}×${SmokeArtifacts.minimumVideoHeight}.',
+      );
+    }
+    if (SmokeVideo.isTooShort(seconds)) {
+      throw StateError(
+        'Smoke video "$testName" is ${seconds.toStringAsFixed(2)} s; smoke videos must be at least '
+        '${SmokeArtifacts.minimumVideoSeconds.toStringAsFixed(0)} s of the scenario running. Extend the scenario '
+        "with more real steps; hold() only to show a step's result.",
+      );
+    }
+  }
+
+  /// The encoding of the recorded frames, holding only what an isolate can
+  /// take (the frames' path and their sizes, never the recorder).
+  Uint8List Function() _encoder() {
+    final path = '${_dir.path}/frames.rgba', width = _width!, height = _height!;
+    final ms = frameInterval.inMilliseconds, fps = (1e6 / frameInterval.inMicroseconds).round();
+    return () => SmokeArtifacts.encodeWebmFromRawFile(
+      File(path),
+      width: width,
+      height: height,
+      frameDurationMs: ms,
+      framesPerSecond: fps,
+    );
+  }
+
+  File _write(String testName, Uint8List bytes, List<String>? usedAssets) {
+    final video = SmokeArtifacts.saveVideoToDir(testName, bytes, SmokeArtifacts.dir, usedAssets: usedAssets);
+    // Next to the length in the sidecar, so a still stretch is visible
+    // without decoding the video.
+    SmokeArtifacts.annotate(testName, {
+      'longestStillSeconds': longestStill.inMicroseconds / 1e6,
+    }, targetDir: video.parent);
+    // ignore: avoid_print
+    print(
+      '[SmokeRecorder] "$testName": ${(recorded.inMicroseconds / 1e6).toStringAsFixed(2)} s, longest still '
+      '${(longestStill.inMicroseconds / 1e6).toStringAsFixed(2)} s',
+    );
+    return video;
   }
 }

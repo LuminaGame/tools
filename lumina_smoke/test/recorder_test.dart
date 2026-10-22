@@ -137,4 +137,40 @@ void main() {
     expect(sidecar, contains('"longestStillSeconds"'));
     expect(sidecar, contains('empty_barrel.glb'));
   }, timeout: const Timeout(Duration(minutes: 3)));
+
+  testWidgets('saveInBackground encodes off the UI isolate and saves the same video and sidecar', (tester) async {
+    if (!SmokeArtifacts.videoEncoderAvailable) return markTestSkipped('no GStreamer or ffmpeg');
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final key = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(key: key, child: const _Sweep()));
+    await tester.pump();
+
+    final short = SmokeRecorder(tester, boundary: find.byKey(key));
+    await short.hold(const Duration(seconds: 2));
+    Object? refused;
+    await tester.runAsync(() async {
+      try {
+        await short.saveInBackground('recorder: too short in background');
+      } catch (e) {
+        refused = e;
+      }
+    });
+    expect(refused, isA<StateError>());
+
+    final rec = SmokeRecorder(tester, boundary: find.byKey(key));
+    await rec.hold(const Duration(milliseconds: 10500));
+    final video = (await tester.runAsync(() => rec.saveInBackground('recorder: sweep in background')))!;
+    expect(SmokeArtifacts.videoDurationSeconds(video), greaterThanOrEqualTo(10.0));
+    expect(SmokeArtifacts.videoFramesPerSecond(video), greaterThanOrEqualTo(29.9));
+    expect(SmokeArtifacts.videoFrameSize(video), (1024, 768));
+    expect(
+      File('${artifacts.path}/recorder_sweep_in_background.json').readAsStringSync(),
+      contains('"longestStillSeconds"'),
+    );
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }

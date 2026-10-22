@@ -111,7 +111,7 @@ ya da `claude mcp add lumina-smoke -- dart <tools>/lumina_smoke/bin/smoke_mcp_br
 | `scroll`, `scroll_until_visible` | bir noktada fare tekerleği; bir widget kurulana kadar, sonra görünüme |
 | `enter_text`, `press_key` | bir metin alanının metni; adıyla mantıksal bir tuş (`pageDown`, `tab`, `a`) |
 | `wait`, `wait_for` | app'in çalışmasına izin verir; bir widget görünene kadar |
-| `record_start`, `record_stop` | görünümün smoke videosu: sürüklemeler kare kare, diğer eylemlerden sonra 0,4 s; adı verilen testin artifact'i olarak smoke video kurallarıyla kaydedilir |
+| `record_start`, `record_stop` | görünümün smoke videosu: sürüklemeler kare kare, diğer eylemlerden sonra 0,4 s; adı verilen testin artifact'i olarak smoke video kurallarıyla kaydedilir; kodlama UI isolate'i dışında yapılır (app'in penceresi yanıt vermeye devam eder) |
 
 Koordinatlar, `widgets`'in bildirdiği gibi görünümün sol üstünden mantıksal pikseldir. Olaylar tester üzerinden gider
 (`sendEventToBinding`): canlı bir binding, test çalışırken cihazınki saydığı olayları atar.

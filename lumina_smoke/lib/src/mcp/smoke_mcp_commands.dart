@@ -316,7 +316,8 @@ class SmokeMcpCommands {
       return SmokeMcpResult.text('name (the smoke test name) is required', isError: true);
     }
     _recorder = null;
-    final file = recorder.save(name);
+    // Encoded off the UI isolate: the app's window keeps answering.
+    final file = (await tester.runAsync(() => recorder.saveInBackground(name)))!;
     return SmokeMcpResult.text('saved ${file.path} (${recorder.recorded.inMilliseconds / 1000} s)');
   }
 

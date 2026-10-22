@@ -111,7 +111,7 @@ or `claude mcp add lumina-smoke -- dart <tools>/lumina_smoke/bin/smoke_mcp_bridg
 | `scroll`, `scroll_until_visible` | mouse-wheel scrolls at a point; until a widget is built, then into view |
 | `enter_text`, `press_key` | a text field's text; a logical key by name (`pageDown`, `tab`, `a`) |
 | `wait`, `wait_for` | let the app run; until a widget appears |
-| `record_start`, `record_stop` | a smoke video of the view: drags play out frame by frame, other actions are followed by 0.4 s; saved as the named test's artifact under the smoke-video rules |
+| `record_start`, `record_stop` | a smoke video of the view: drags play out frame by frame, other actions are followed by 0.4 s; saved as the named test's artifact under the smoke-video rules, encoded off the UI isolate (the app's window keeps answering) |
 
 Coordinates are logical pixels from the view's top left, as `widgets` reports them. Events go through the tester
 (`sendEventToBinding`): a live binding drops events it takes for the device's while a test runs.

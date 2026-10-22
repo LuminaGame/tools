@@ -132,6 +132,7 @@ Frames go straight to a temporary raw file (a 1600×1000 frame is 6 MB), at full
 | `typeText` | `Future<void> typeText(Finder field, String text, {Duration perCharacter = const Duration(milliseconds: 100)})...` | Types [text] into [field] the way a user does, one character at a time, with the field updating on video as it goes. Each prefix goes through [WidgetTester.enterText], so the field's `onChanged` fires per keystroke. |
 | `drag` | `Future<void> drag(Offset from, Offset to, {int steps = 30, PointerDeviceKind kind = PointerDeviceKind.mouse, i...` | Drags a pointer from [from] to [to] in [steps] moves, recording every step: the drag plays out on video at the pace a hand would move. |
 | `save` | `File save(String testName, {List<String>? usedAssets})` | Encodes the recording and saves it as [testName]'s video. Throws when it is shorter than [SmokeArtifacts.minimumVideoSeconds] or smaller than [SmokeArtifacts.minimumVideoWidth] × [SmokeArtifacts.minimumVideoHeight]. |
+| `saveInBackground` | `Future<File> saveInBackground(String testName, {List<String>? usedAssets})` | [save] with the encoding on a background isolate, so a live app's window keeps drawing meanwhile (a long recording encoded on the UI isolate stops it answering, and the system closes it as hung). Under a test, call it inside [WidgetTester.runAsync]. |
 
 ## `lib/src/flutter/tutorial.dart`
 
