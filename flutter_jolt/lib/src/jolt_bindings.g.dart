@@ -1334,6 +1334,12 @@ final class JoltClothSettings extends ffi.Struct {
 
   @ffi.Bool()
   external bool double_sided;
+
+  /// When set, each tetrahedron's volume compliance is volume_compliance
+  /// times six times its rest volume (m³): the same material whatever the
+  /// tetrahedra's size (one compliance for all made small ones far softer).
+  @ffi.Bool()
+  external bool volume_compliance_per_volume;
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are

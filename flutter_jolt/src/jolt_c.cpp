@@ -1167,6 +1167,7 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
   s->restitution = 0.0f;
   s->pressure = 0.0f;
   s->volume_compliance = 0.0f;
+  s->volume_compliance_per_volume = false;
   s->vertex_radius = 0.01f;
   s->gravity_factor = 1.0f;
   s->update_position = true;
@@ -1217,8 +1218,10 @@ static uint32_t createSoftBody(JoltWorld* world, const float* positions, const f
       const Vec3 e2 = Vec3(shared->mVertices[q[2]].mPosition) - a;
       const Vec3 e3 = Vec3(shared->mVertices[q[3]].mPosition) - a;
       // No volume at rest: nothing to keep.
-      if (std::abs(e1.Cross(e2).Dot(e3)) < 1.0e-12f) continue;
-      shared->mVolumeConstraints.push_back(SoftBodySharedSettings::Volume(q[0], q[1], q[2], q[3], volumeCompliance));
+      const float sixVolume = std::abs(e1.Cross(e2).Dot(e3));
+      if (sixVolume < 1.0e-12f) continue;
+      shared->mVolumeConstraints.push_back(SoftBodySharedSettings::Volume(
+          q[0], q[1], q[2], q[3], s->volume_compliance_per_volume ? volumeCompliance * sixVolume : volumeCompliance));
     }
     shared->CalculateVolumeConstraintVolumes();
   }

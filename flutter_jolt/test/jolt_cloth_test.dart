@@ -550,6 +550,51 @@ void main() {
       expect(slumped, lessThan(kept - 0.2), reason: 'the edges alone do not hold the volume');
     });
 
+    test('a compliance per volume is that compliance times six times each tetrahedron rest volume', () {
+      // Every tetrahedron of the cube is the same: a twelfth of 0.4³ m³.
+      const sixVolume = 6 * 0.4 * 0.4 * 0.4 / 12;
+      Float32List settled({required double compliance, required bool perVolume}) {
+        final world = JoltWorld(workerThreads: 0);
+        addTearDown(world.dispose);
+        final ground = JoltShape.box(Vector3(5, 0.5, 5));
+        world.createBody(ground, JoltBodySettings(motionType: JoltMotionType.static_, position: Vector3(0, -0.5, 0)));
+        ground.release();
+        final (v, t, tets) = cube();
+        final body = world.createCloth(
+          v,
+          t,
+          position: Vector3(0, 0.5, 0),
+          settings: JoltClothSettings(
+            edgeCompliance: 5e-2,
+            shearCompliance: null,
+            bendCompliance: null,
+            bend: JoltClothBend.none,
+            tethers: JoltClothTethers.none,
+            volumeCompliance: compliance,
+            volumeCompliancePerVolume: perVolume,
+            doubleSided: false,
+            allowSleeping: false,
+          ),
+          tetrahedra: tets,
+        );
+        for (var i = 0; i < 240; i++) {
+          world.step(1 / 120);
+        }
+        return world.clothVertices(body);
+      }
+
+      final scaled = settled(compliance: 1e-4, perVolume: true);
+      final same = settled(compliance: 1e-4 * sixVolume, perVolume: false);
+      final rigid = settled(compliance: 0, perVolume: false);
+      var gap = 0.0, softer = 0.0;
+      for (var i = 0; i < scaled.length; i++) {
+        gap = math.max(gap, (scaled[i] - same[i]).abs());
+        softer = math.max(softer, (scaled[i] - rigid[i]).abs());
+      }
+      expect(gap, lessThan(1e-4));
+      expect(softer, greaterThan(1e-3), reason: 'the compliance does soften it');
+    });
+
     test('a tetrahedron with an index past the vertices or a repeated vertex is refused', () {
       final world = JoltWorld(workerThreads: 1);
       addTearDown(world.dispose);

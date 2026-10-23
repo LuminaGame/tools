@@ -675,6 +675,12 @@ final class JoltClothSettings extends ffi.Struct {
 
   bool get double_sided => FlutterJoltModule.heap.getUint8($address + 62) != 0;
   set double_sided(bool value) => FlutterJoltModule.heap.setUint8($address + 62, value ? 1 : 0);
+
+  /// When set, each tetrahedron's volume compliance is volume_compliance
+  /// times six times its rest volume (m³): the same material whatever the
+  /// tetrahedra's size (one compliance for all made small ones far softer).
+  bool get volume_compliance_per_volume => FlutterJoltModule.heap.getUint8($address + 63) != 0;
+  set volume_compliance_per_volume(bool value) => FlutterJoltModule.heap.setUint8($address + 63, value ? 1 : 0);
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are

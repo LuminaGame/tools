@@ -35,6 +35,7 @@ class JoltClothSettings {
     this.restitution = 0.0,
     this.pressure = 0.0,
     this.volumeCompliance = 0.0,
+    this.volumeCompliancePerVolume = false,
     this.vertexRadius = 0.01,
     this.gravityFactor = 1.0,
     this.allowSleeping = true,
@@ -60,6 +61,13 @@ class JoltClothSettings {
   /// ([JoltWorldCloth.createCloth]'s `tetrahedra`): 0 keeps every
   /// tetrahedron's rest volume rigidly, larger lets it squash.
   double volumeCompliance;
+
+  /// [volumeCompliance] per unit of each tetrahedron's size: its compliance
+  /// is [volumeCompliance] times six times its rest volume (m³), so
+  /// tetrahedra of any size are the same material (one compliance for all
+  /// makes the small ones far softer, and squashed past flat they turn
+  /// inside out).
+  bool volumeCompliancePerVolume;
 
   /// How far vertices keep from other bodies' surfaces (m).
   double vertexRadius;
@@ -175,6 +183,7 @@ extension JoltWorldCloth on JoltWorld {
         ..restitution = s.restitution
         ..pressure = s.pressure
         ..volume_compliance = s.volumeCompliance
+        ..volume_compliance_per_volume = s.volumeCompliancePerVolume
         ..vertex_radius = s.vertexRadius
         ..gravity_factor = s.gravityFactor
         ..update_position = true

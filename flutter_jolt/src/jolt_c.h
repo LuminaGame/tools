@@ -309,6 +309,10 @@ typedef struct JoltClothSettings {
   bool update_position;
   bool allow_sleeping;
   bool double_sided;
+  /// When set, each tetrahedron's volume compliance is volume_compliance
+  /// times six times its rest volume (m³): the same material whatever the
+  /// tetrahedra's size (one compliance for all made small ones far softer).
+  bool volume_compliance_per_volume;
 } JoltClothSettings;
 
 /// Fills settings with cloth defaults (stiff edges, soft dihedral bend,
