@@ -1169,6 +1169,7 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
   s->volume_compliance = 0.0f;
   s->volume_compliance_per_volume = false;
   s->edge_compliance_per_length = false;
+  s->compliance_scale = nullptr;
   s->vertex_radius = 0.01f;
   s->gravity_factor = 1.0f;
   s->update_position = true;
@@ -1207,7 +1208,21 @@ static uint32_t createSoftBody(JoltWorld* world, const float* positions, const f
   const SoftBodySharedSettings::EBendType bend = s->bend_type == 2   ? SoftBodySharedSettings::EBendType::Dihedral
                                                  : s->bend_type == 1 ? SoftBodySharedSettings::EBendType::Distance
                                                                      : SoftBodySharedSettings::EBendType::None;
-  shared->CreateConstraints(&attributes, 1, bend);
+  if (s->compliance_scale != nullptr) {
+    // One attribute per vertex: its compliances scaled (a disabled kind stays
+    // disabled).
+    std::vector<SoftBodySharedSettings::VertexAttributes> perVertex(vertex_count, attributes);
+    for (uint32_t i = 0; i < vertex_count; ++i) {
+      const float k = std::max(0.0f, s->compliance_scale[i]);
+      SoftBodySharedSettings::VertexAttributes& a = perVertex[i];
+      if (a.mCompliance < FLT_MAX / 2) a.mCompliance *= k;
+      if (a.mShearCompliance < FLT_MAX / 2) a.mShearCompliance *= k;
+      if (a.mBendCompliance < FLT_MAX / 2) a.mBendCompliance *= k;
+    }
+    shared->CreateConstraints(perVertex.data(), vertex_count, bend);
+  } else {
+    shared->CreateConstraints(&attributes, 1, bend);
+  }
   if (s->edge_compliance_per_length) {
     for (SoftBodySharedSettings::Edge& e : shared->mEdgeConstraints) {
       // Disabled kinds (FLT_MAX) stay disabled.

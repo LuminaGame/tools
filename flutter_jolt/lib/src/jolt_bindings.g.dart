@@ -1347,6 +1347,11 @@ final class JoltClothSettings extends ffi.Struct {
   /// for all makes finely cut skin far softer, and it buckles).
   @ffi.Bool()
   external bool edge_compliance_per_length;
+
+  /// Optional, one per vertex: the edge, shear and bend compliances scaled
+  /// by it for the constraints at that vertex (Jolt averages the two ends'
+  /// attributes per constraint); null for the same everywhere.
+  external ffi.Pointer<ffi.Float> compliance_scale;
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are

@@ -688,6 +688,12 @@ final class JoltClothSettings extends ffi.Struct {
   /// for all makes finely cut skin far softer, and it buckles).
   bool get edge_compliance_per_length => FlutterJoltModule.heap.getUint8($address + 64) != 0;
   set edge_compliance_per_length(bool value) => FlutterJoltModule.heap.setUint8($address + 64, value ? 1 : 0);
+
+  /// Optional, one per vertex: the edge, shear and bend compliances scaled
+  /// by it for the constraints at that vertex (Jolt averages the two ends'
+  /// attributes per constraint); null for the same everywhere.
+  ffi.Pointer<ffi.Float> get compliance_scale => ffi.Pointer<ffi.Float>.fromAddress(FlutterJoltModule.heap.getUint32($address + 68, Endian.little));
+  set compliance_scale(ffi.Pointer<ffi.Float> value) => FlutterJoltModule.heap.setUint32($address + 68, value.address, Endian.little);
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are
@@ -980,7 +986,7 @@ void $registerJoltBindings() {
   ffi.$registerStruct<JoltBodySettings>(136, 8, JoltBodySettings.$at);
   ffi.$registerStruct<JoltContact>(56, 4, JoltContact.$at);
   ffi.$registerStruct<JoltRayHit>(36, 4, JoltRayHit.$at);
-  ffi.$registerStruct<JoltClothSettings>(68, 4, JoltClothSettings.$at);
+  ffi.$registerStruct<JoltClothSettings>(72, 4, JoltClothSettings.$at);
   ffi.$registerStruct<JoltClothSkin>(28, 4, JoltClothSkin.$at);
   ffi.$registerStruct<JoltSwingTwistSettings>(92, 4, JoltSwingTwistSettings.$at);
   ffi.$registerStruct<JoltHingeSettings>(84, 4, JoltHingeSettings.$at);

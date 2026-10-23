@@ -318,6 +318,10 @@ typedef struct JoltClothSettings {
   /// centimetres: the same material whatever the mesh's cut (one compliance
   /// for all makes finely cut skin far softer, and it buckles).
   bool edge_compliance_per_length;
+  /// Optional, one per vertex: the edge, shear and bend compliances scaled
+  /// by it for the constraints at that vertex (Jolt averages the two ends'
+  /// attributes per constraint); null for the same everywhere.
+  const float* compliance_scale;
 } JoltClothSettings;
 
 /// Fills settings with cloth defaults (stiff edges, soft dihedral bend,

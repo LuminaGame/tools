@@ -38,6 +38,7 @@ class JoltClothSettings {
     this.volumeCompliancePerVolume = false,
     this.edgeCompliancePerLength = false,
     this.updatePosition = true,
+    this.complianceScale,
     this.vertexRadius = 0.01,
     this.gravityFactor = 1.0,
     this.allowSleeping = true,
@@ -83,6 +84,12 @@ class JoltClothSettings {
   /// same world place (its skinned targets drifted with the frame, and the
   /// cloth was dragged after them).
   bool updatePosition;
+
+  /// One factor per vertex on [edgeCompliance], [shearCompliance] and
+  /// [bendCompliance] for the constraints at that vertex (Jolt averages a
+  /// constraint's two ends): stiffer skin where it is attached, say. Null
+  /// for the same compliance everywhere.
+  Float32List? complianceScale;
 
   /// How far vertices keep from other bodies' surfaces (m).
   double vertexRadius;
@@ -161,6 +168,11 @@ extension JoltWorldCloth on JoltWorld {
     final cs = calloc<b.JoltClothSettings>();
     final tetCount = (tetrahedra?.length ?? 0) ~/ 4;
     final tets = calloc<Uint32>(tetCount == 0 ? 1 : tetCount * 4);
+    final scale = s.complianceScale;
+    if (scale != null && scale.length < n) {
+      throw ArgumentError('complianceScale needs one factor per vertex');
+    }
+    final scales = calloc<Float>(n);
     try {
       for (var i = 0; i < tetCount * 4; i++) {
         tets[i] = tetrahedra![i];
@@ -170,6 +182,7 @@ extension JoltWorldCloth on JoltWorld {
         pos[3 * i + 1] = vertices[i].y;
         pos[3 * i + 2] = vertices[i].z;
         inv[i] = inverseMasses?[i] ?? 1.0;
+        if (scale != null) scales[i] = scale[i];
       }
       for (var i = 0; i < triangles.length; i++) {
         idx[i] = triangles[i];
@@ -200,6 +213,7 @@ extension JoltWorldCloth on JoltWorld {
         ..volume_compliance = s.volumeCompliance
         ..volume_compliance_per_volume = s.volumeCompliancePerVolume
         ..edge_compliance_per_length = s.edgeCompliancePerLength
+        ..compliance_scale = scale == null ? nullptr : scales
         ..vertex_radius = s.vertexRadius
         ..gravity_factor = s.gravityFactor
         ..update_position = s.updatePosition
@@ -258,7 +272,8 @@ extension JoltWorldCloth on JoltWorld {
         ..free(idx)
         ..free(pose)
         ..free(cs)
-        ..free(tets);
+        ..free(tets)
+        ..free(scales);
     }
   }
 

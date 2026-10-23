@@ -645,6 +645,63 @@ void main() {
       expect(softer, greaterThan(1e-3), reason: 'the compliance does soften it');
     });
 
+    test('a compliance scale per vertex stiffens the constraints at those vertices', () {
+      // A strip of 10 cm squares hung from its top row, shear and bend off.
+      Float32List settled(Float32List? scale, double compliance) {
+        final world = JoltWorld(workerThreads: 0);
+        addTearDown(world.dispose);
+        const n = 6;
+        final v = <Vector3>[
+          for (var j = 0; j < n; j++)
+            for (var i = 0; i < n; i++) Vector3(0.1 * i, -0.1 * j, 0),
+        ];
+        final t = <int>[
+          for (var j = 0; j + 1 < n; j++)
+            for (var i = 0; i + 1 < n; i++) ...[
+              j * n + i, (j + 1) * n + i, j * n + i + 1, //
+              j * n + i + 1, (j + 1) * n + i, (j + 1) * n + i + 1,
+            ],
+        ];
+        final body = world.createCloth(
+          v,
+          t,
+          inverseMasses: [for (var k = 0; k < n * n; k++) k < n ? 0.0 : 1.0],
+          settings: JoltClothSettings(
+            edgeCompliance: compliance,
+            shearCompliance: null,
+            bendCompliance: null,
+            bend: JoltClothBend.none,
+            tethers: JoltClothTethers.none,
+            complianceScale: scale,
+            allowSleeping: false,
+          ),
+        );
+        for (var i = 0; i < 240; i++) {
+          world.step(1 / 120);
+        }
+        return world.clothVertices(body);
+      }
+
+      const n = 6;
+      final ones = Float32List(n * n)..fillRange(0, n * n, 1);
+      final zeros = Float32List(n * n);
+      final same = settled(ones, 1e-2), plain = settled(null, 1e-2);
+      final stiff = settled(zeros, 1e-2), rigid = settled(null, 0);
+      var gap = 0.0, gapRigid = 0.0, stretch = 0.0;
+      for (var i = 0; i < same.length; i++) {
+        gap = math.max(gap, (same[i] - plain[i]).abs());
+        gapRigid = math.max(gapRigid, (stiff[i] - rigid[i]).abs());
+      }
+      // The bottom row's drop with the soft strip.
+      for (var i = n * (n - 1); i < n * n; i++) {
+        stretch = math.max(stretch, -plain[3 * i + 1] - 0.5);
+      }
+      expect(gap, lessThan(1e-5));
+      expect(gapRigid, lessThan(1e-5));
+      expect(stretch, greaterThan(1e-3), reason: 'the soft strip does stretch');
+      expect(() => settled(Float32List(3), 1e-2), throwsArgumentError);
+    });
+
     test('a tetrahedron with an index past the vertices or a repeated vertex is refused', () {
       final world = JoltWorld(workerThreads: 1);
       addTearDown(world.dispose);
