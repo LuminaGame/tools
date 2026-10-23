@@ -37,6 +37,7 @@ class JoltClothSettings {
     this.volumeCompliance = 0.0,
     this.volumeCompliancePerVolume = false,
     this.edgeCompliancePerLength = false,
+    this.updatePosition = true,
     this.vertexRadius = 0.01,
     this.gravityFactor = 1.0,
     this.allowSleeping = true,
@@ -75,6 +76,13 @@ class JoltClothSettings {
   /// whatever the mesh's cut (one compliance for all makes finely cut skin
   /// far softer, and it buckles).
   bool edgeCompliancePerLength;
+
+  /// Whether the body's position follows its vertices' centre of mass as
+  /// they move (the default). Off, the body's frame stays where the cloth
+  /// was created, so a skinned cloth's one still joint keeps meaning the
+  /// same world place (its skinned targets drifted with the frame, and the
+  /// cloth was dragged after them).
+  bool updatePosition;
 
   /// How far vertices keep from other bodies' surfaces (m).
   double vertexRadius;
@@ -194,7 +202,7 @@ extension JoltWorldCloth on JoltWorld {
         ..edge_compliance_per_length = s.edgeCompliancePerLength
         ..vertex_radius = s.vertexRadius
         ..gravity_factor = s.gravityFactor
-        ..update_position = true
+        ..update_position = s.updatePosition
         ..allow_sleeping = s.allowSleeping
         ..double_sided = s.doubleSided;
       final id = skin == null && tetCount > 0
@@ -256,12 +264,16 @@ extension JoltWorldCloth on JoltWorld {
 
   static void _checkTetrahedra(List<int> tetrahedra, int vertexCount) {
     if (tetrahedra.length % 4 != 0) {
-      throw ArgumentError('tetrahedra needs four vertex indices per tetrahedron');
+      throw ArgumentError(
+        'tetrahedra needs four vertex indices per tetrahedron',
+      );
     }
     for (var i = 0; i < tetrahedra.length; i += 4) {
       final q = tetrahedra.sublist(i, i + 4);
       if (q.any((v) => v < 0 || v >= vertexCount)) {
-        throw ArgumentError('tetrahedron ${i ~/ 4} names a vertex past the $vertexCount vertices: $q');
+        throw ArgumentError(
+          'tetrahedron ${i ~/ 4} names a vertex past the $vertexCount vertices: $q',
+        );
       }
       if (q.toSet().length != 4) {
         throw ArgumentError('tetrahedron ${i ~/ 4} repeats a vertex: $q');
