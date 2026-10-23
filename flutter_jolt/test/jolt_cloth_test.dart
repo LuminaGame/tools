@@ -595,6 +595,56 @@ void main() {
       expect(softer, greaterThan(1e-3), reason: 'the compliance does soften it');
     });
 
+    test('a compliance per length is that compliance times each edge rest length in centimetres', () {
+      // A strip of 10 cm squares hung from its top row, shear and bend off:
+      // every constraint is a 10 cm edge.
+      Float32List settled({required double compliance, required bool perLength}) {
+        final world = JoltWorld(workerThreads: 0);
+        addTearDown(world.dispose);
+        const n = 6;
+        final v = <Vector3>[
+          for (var j = 0; j < n; j++)
+            for (var i = 0; i < n; i++) Vector3(0.1 * i, -0.1 * j, 0),
+        ];
+        final t = <int>[
+          for (var j = 0; j + 1 < n; j++)
+            for (var i = 0; i + 1 < n; i++) ...[
+              j * n + i, (j + 1) * n + i, j * n + i + 1, //
+              j * n + i + 1, (j + 1) * n + i, (j + 1) * n + i + 1,
+            ],
+        ];
+        final body = world.createCloth(
+          v,
+          t,
+          inverseMasses: [for (var k = 0; k < n * n; k++) k < n ? 0.0 : 1.0],
+          settings: JoltClothSettings(
+            edgeCompliance: compliance,
+            shearCompliance: null,
+            bendCompliance: null,
+            bend: JoltClothBend.none,
+            tethers: JoltClothTethers.none,
+            edgeCompliancePerLength: perLength,
+            allowSleeping: false,
+          ),
+        );
+        for (var i = 0; i < 240; i++) {
+          world.step(1 / 120);
+        }
+        return world.clothVertices(body);
+      }
+
+      final scaled = settled(compliance: 1e-3, perLength: true);
+      final same = settled(compliance: 1e-3 * 10, perLength: false);
+      final rigid = settled(compliance: 0, perLength: false);
+      var gap = 0.0, softer = 0.0;
+      for (var i = 0; i < scaled.length; i++) {
+        gap = math.max(gap, (scaled[i] - same[i]).abs());
+        softer = math.max(softer, (scaled[i] - rigid[i]).abs());
+      }
+      expect(gap, lessThan(1e-4));
+      expect(softer, greaterThan(1e-3), reason: 'the compliance does soften it');
+    });
+
     test('a tetrahedron with an index past the vertices or a repeated vertex is refused', () {
       final world = JoltWorld(workerThreads: 1);
       addTearDown(world.dispose);

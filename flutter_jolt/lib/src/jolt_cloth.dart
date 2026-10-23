@@ -36,6 +36,7 @@ class JoltClothSettings {
     this.pressure = 0.0,
     this.volumeCompliance = 0.0,
     this.volumeCompliancePerVolume = false,
+    this.edgeCompliancePerLength = false,
     this.vertexRadius = 0.01,
     this.gravityFactor = 1.0,
     this.allowSleeping = true,
@@ -68,6 +69,12 @@ class JoltClothSettings {
   /// makes the small ones far softer, and squashed past flat they turn
   /// inside out).
   bool volumeCompliancePerVolume;
+
+  /// [edgeCompliance], [shearCompliance] and a distance [bendCompliance]
+  /// per centimetre of each constraint's rest length: the same material
+  /// whatever the mesh's cut (one compliance for all makes finely cut skin
+  /// far softer, and it buckles).
+  bool edgeCompliancePerLength;
 
   /// How far vertices keep from other bodies' surfaces (m).
   double vertexRadius;
@@ -184,6 +191,7 @@ extension JoltWorldCloth on JoltWorld {
         ..pressure = s.pressure
         ..volume_compliance = s.volumeCompliance
         ..volume_compliance_per_volume = s.volumeCompliancePerVolume
+        ..edge_compliance_per_length = s.edgeCompliancePerLength
         ..vertex_radius = s.vertexRadius
         ..gravity_factor = s.gravityFactor
         ..update_position = true

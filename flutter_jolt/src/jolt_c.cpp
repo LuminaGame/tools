@@ -1168,6 +1168,7 @@ void jolt_cloth_settings_init(JoltClothSettings* s) {
   s->pressure = 0.0f;
   s->volume_compliance = 0.0f;
   s->volume_compliance_per_volume = false;
+  s->edge_compliance_per_length = false;
   s->vertex_radius = 0.01f;
   s->gravity_factor = 1.0f;
   s->update_position = true;
@@ -1207,6 +1208,15 @@ static uint32_t createSoftBody(JoltWorld* world, const float* positions, const f
                                                  : s->bend_type == 1 ? SoftBodySharedSettings::EBendType::Distance
                                                                      : SoftBodySharedSettings::EBendType::None;
   shared->CreateConstraints(&attributes, 1, bend);
+  if (s->edge_compliance_per_length) {
+    for (SoftBodySharedSettings::Edge& e : shared->mEdgeConstraints) {
+      // Disabled kinds (FLT_MAX) stay disabled.
+      if (e.mCompliance >= FLT_MAX / 2) continue;
+      const Vec3 a = Vec3(shared->mVertices[e.mVertex[0]].mPosition);
+      const Vec3 b = Vec3(shared->mVertices[e.mVertex[1]].mPosition);
+      e.mCompliance *= (a - b).Length() * 100.0f;
+    }
+  }
   if (tetrahedra != nullptr && tetrahedron_count > 0) {
     const float volumeCompliance = std::max(0.0f, s->volume_compliance);
     for (uint32_t t = 0; t < tetrahedron_count; ++t) {

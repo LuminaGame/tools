@@ -681,6 +681,13 @@ final class JoltClothSettings extends ffi.Struct {
   /// tetrahedra's size (one compliance for all made small ones far softer).
   bool get volume_compliance_per_volume => FlutterJoltModule.heap.getUint8($address + 63) != 0;
   set volume_compliance_per_volume(bool value) => FlutterJoltModule.heap.setUint8($address + 63, value ? 1 : 0);
+
+  /// When set, each edge's compliance (edge, shear and distance-bend
+  /// constraints alike) is its compliance times its rest length in
+  /// centimetres: the same material whatever the mesh's cut (one compliance
+  /// for all makes finely cut skin far softer, and it buckles).
+  bool get edge_compliance_per_length => FlutterJoltModule.heap.getUint8($address + 64) != 0;
+  set edge_compliance_per_length(bool value) => FlutterJoltModule.heap.setUint8($address + 64, value ? 1 : 0);
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are
@@ -973,7 +980,7 @@ void $registerJoltBindings() {
   ffi.$registerStruct<JoltBodySettings>(136, 8, JoltBodySettings.$at);
   ffi.$registerStruct<JoltContact>(56, 4, JoltContact.$at);
   ffi.$registerStruct<JoltRayHit>(36, 4, JoltRayHit.$at);
-  ffi.$registerStruct<JoltClothSettings>(64, 4, JoltClothSettings.$at);
+  ffi.$registerStruct<JoltClothSettings>(68, 4, JoltClothSettings.$at);
   ffi.$registerStruct<JoltClothSkin>(28, 4, JoltClothSkin.$at);
   ffi.$registerStruct<JoltSwingTwistSettings>(92, 4, JoltSwingTwistSettings.$at);
   ffi.$registerStruct<JoltHingeSettings>(84, 4, JoltHingeSettings.$at);

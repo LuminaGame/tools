@@ -1340,6 +1340,13 @@ final class JoltClothSettings extends ffi.Struct {
   /// tetrahedra's size (one compliance for all made small ones far softer).
   @ffi.Bool()
   external bool volume_compliance_per_volume;
+
+  /// When set, each edge's compliance (edge, shear and distance-bend
+  /// constraints alike) is its compliance times its rest length in
+  /// centimetres: the same material whatever the mesh's cut (one compliance
+  /// for all makes finely cut skin far softer, and it buckles).
+  @ffi.Bool()
+  external bool edge_compliance_per_length;
 }
 
 /// Skinning of a cloth to a skeleton (a garment on a character). Frames are

@@ -313,6 +313,11 @@ typedef struct JoltClothSettings {
   /// times six times its rest volume (m³): the same material whatever the
   /// tetrahedra's size (one compliance for all made small ones far softer).
   bool volume_compliance_per_volume;
+  /// When set, each edge's compliance (edge, shear and distance-bend
+  /// constraints alike) is its compliance times its rest length in
+  /// centimetres: the same material whatever the mesh's cut (one compliance
+  /// for all makes finely cut skin far softer, and it buckles).
+  bool edge_compliance_per_length;
 } JoltClothSettings;
 
 /// Fills settings with cloth defaults (stiff edges, soft dihedral bend,
